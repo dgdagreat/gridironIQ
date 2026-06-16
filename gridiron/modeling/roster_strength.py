@@ -22,14 +22,25 @@ UNIT_SIZE: dict[str, int] = {
 #: Talent baseline for unrated players (rookies/UDFAs with no grade yet).
 UNRATED_TALENT = 0.25
 
-# --- Age decline: a static rating is not destiny. Past a position's peak age,
-# talent is discounted per year (so an aging star isn't graded like his prime). --
-PEAK_AGE: dict[str, int] = {
-    "QB": 33, "RB": 26, "WR": 28, "TE": 29, "OL": 30, "IDL": 29,
-    "EDGE": 29, "LB": 28, "CB": 28, "S": 29, "SPEC": 35,
+# --- Age decline is position-specific: a static rating is not destiny, and
+# positions don't age alike. A running back falls off a cliff in his late 20s; a
+# QB, O-lineman, or specialist ages gracefully. Each position gets its own
+# (peak age, decline per year past peak, floor) curve. ------------------------
+AGE_CURVE: dict[str, tuple[float, float, float]] = {
+    # pos:    (peak, decline/yr, floor)   -- football aging reality
+    "QB":   (33, 0.020, 0.70),   # ages best — can stay elite into late 30s
+    "RB":   (26, 0.070, 0.40),   # earliest + steepest cliff
+    "WR":   (27, 0.045, 0.55),
+    "TE":   (28, 0.045, 0.55),
+    "OL":   (29, 0.030, 0.60),   # durable; technique outlasts athleticism
+    "IDL":  (28, 0.040, 0.55),
+    "EDGE": (28, 0.050, 0.50),   # bend/burst fade with age
+    "LB":   (27, 0.055, 0.50),   # speed-dependent
+    "CB":   (28, 0.060, 0.45),   # speed cliff hits hard
+    "S":    (29, 0.045, 0.55),   # ages a touch better than CB
+    "SPEC": (35, 0.010, 0.85),   # kickers/punters barely age
 }
-AGE_DECLINE_PER_YEAR = 0.035      # talent lost per year past peak
-AGE_FLOOR = 0.60                  # an old vet is discounted, not erased
+_DEFAULT_CURVE = (29, 0.040, 0.55)
 
 # --- Production trend: reward ascending players, mark down decliners. ----------
 TREND_SENSITIVITY = 0.5
@@ -37,13 +48,13 @@ TREND_MIN, TREND_MAX = 0.80, 1.15
 
 
 def age_factor(pos_group: str, age: float | None) -> float:
-    """Multiplier ≤ 1 that discounts talent past a position's peak age."""
+    """Position-specific age multiplier (≤1): RBs decline fast, QBs/kickers slow."""
     if age is None or pd.isna(age):
         return 1.0
-    peak = PEAK_AGE.get(pos_group, 29)
+    peak, decline, floor = AGE_CURVE.get(pos_group, _DEFAULT_CURVE)
     if age <= peak:
         return 1.0
-    return max(AGE_FLOOR, 1.0 - AGE_DECLINE_PER_YEAR * (age - peak))
+    return max(floor, 1.0 - decline * (age - peak))
 
 
 def trend_factor(av0: float | None, av1: float | None, av2: float | None) -> float:
