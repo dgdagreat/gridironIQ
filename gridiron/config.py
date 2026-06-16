@@ -130,6 +130,7 @@ CONTRACTS_CSV_URL: str = (
 # --------------------------------------------------------------------------- #
 # Film Room (Anthropic) settings
 # --------------------------------------------------------------------------- #
-#: Model used to generate the natural-language post-game film breakdown.
+#: Model used to generate the natural-language film reports (pre- and post-game).
 ANTHROPIC_MODEL: str = "claude-sonnet-4-6"
-ANTHROPIC_MAX_TOKENS: int = 2000
+#: Headroom for adaptive thinking + the written report (well under the non-stream cap).
+ANTHROPIC_MAX_TOKENS: int = 3000

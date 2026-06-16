@@ -14,7 +14,7 @@ Three products, one thesis:
 | | |
 |---|---|
 | **📊 Boardroom — Cap Efficiency Analyzer** | Where the money goes, and whether it buys rings. Positional cap shares 1994→present, era-segmented, correlated with Super Bowl appearances/wins, with a scikit-learn pipeline (cross-validation + feature importance) and k-means roster archetypes. |
-| **🎬 Film Room — Post-Game Breakdown** | Why a team lost. Pulls nflfastR play-by-play, extracts tactical metrics (pressure, EPA, red-zone, turnovers, YAC), and uses the Anthropic API (`claude-sonnet-4-6`) to write a film-room report. |
+| **🎬 Film Room — Pre & Post Game** | Every game on the schedule. Completed games get a post-game breakdown ("why they lost") from nflfastR play-by-play — with **player attribution** (who took the sacks, who turned it over) and situational splits; upcoming games get a **matchup preview** from each team's form + roster-strength edges. `claude-sonnet-4-6` (adaptive thinking) writes the report. |
 | **🏆 Super Bowl Maxer** | How far is a team's *current* roster from a champion's? Scores every live roster (production + external grade, age/trend-adjusted) against a champion blueprint weighted by the Boardroom's findings → readiness score, league rank, ranked needs, and the **best available free agents** to fill them. Refreshes daily so it tracks signings, trades, and cuts. |
 
 ---
@@ -62,7 +62,8 @@ gridironIQ/
 │   │   ├── reference.py       # teams, position groups, Super Bowl results
 │   │   ├── cap_data.py        # OTC/nflverse contracts → positional spending shares
 │   │   ├── load_cap.py        # cap ETL orchestration → SQLite
-│   │   └── rosters.py         # live rosters + Madden/AV talent grades (Maxer)
+│   │   ├── rosters.py         # live rosters + Madden/AV talent grades (Maxer)
+│   │   └── schedules.py       # full game slate (played + scheduled) for Film Room
 │   ├── modeling/
 │   │   ├── cap_efficiency.py  # champion premium, spend↔success correlation, verdicts
 │   │   ├── ml_pipeline.py     # sklearn SB-probability model (CV + feature importance)
@@ -71,8 +72,9 @@ gridironIQ/
 │   │   ├── sb_maxer.py        # champion blueprint + gap/readiness/needs (Maxer)
 │   │   └── free_agents.py     # best available FAs to fill each team's needs (Maxer)
 │   └── filmroom/
-│       ├── pbp_metrics.py     # nflfastR play-by-play → tactical metrics
-│       └── breakdown.py       # Anthropic claude-sonnet-4-6 film report
+│       ├── pbp_metrics.py     # play-by-play → metrics, attribution, team form
+│       ├── matchup.py         # pre-game preview payloads (form + roster edges)
+│       └── breakdown.py       # claude-sonnet-4-6 report (pre & post, adaptive thinking)
 ├── sql/
 │   ├── 01_schema.sql          # canonical data model (tables)
 │   └── 02_views.sql           # analytical views + indexes
@@ -193,6 +195,14 @@ modeling layer therefore defaults to the **2011–2024** window, and the normali
 share keeps eras comparable. (Pleasingly, the 2011 CBA is both a rule milestone
 *and* the data-quality boundary.)
 
+**Two modes, every game.** Completed games get a post-game breakdown from
+play-by-play — with player attribution (who took the sacks, who turned it over,
+who moved the ball) and situational splits (by-down and by-half EPA). Scheduled
+games get a pre-game preview built from each team's season form plus their Maxer
+roster-strength edges (no play-by-play exists yet). The schedule (`nfldata`
+games.csv) drives the picker, and `claude-sonnet-4-6` runs with adaptive thinking
+so it reasons through the numbers before writing.
+
 **Honest about what's charted.** The Film Room computes what play-by-play
 genuinely supports (EPA, pressure via `qb_hit`/`sack`, turnovers, red-zone and
 down efficiency, YAC). True **WR separation** and **yards after contact** are
@@ -213,11 +223,12 @@ within its position group. Both are all-position signals joined by `gsis_id`, so
 the trenches and secondary — where box stats lie — still get a fair grade.
 Position groups come from the granular `depth_chart_position` (so EDGE/IDL and
 CB/S stay split). A static grade is **not** taken as gospel: it's discounted by a
-**position-aware age curve** (talent falls each year past a position's peak — a
-QB ages differently than a running back) and by a **3-season production trend**
-(AV trajectory), so an aging, declining star is graded as one — not as his prime
-self. (Example: a 37-year-old TE with a 93 Madden and falling AV scores ~0.64,
-not 1.0.)
+**position-specific age curve** — each position has its own peak age, decline rate,
+and floor (`AGE_CURVE`), so a running back falls off a cliff in his late 20s while
+a QB, O-lineman, or kicker ages gracefully — and by a **3-season production trend**
+(AV trajectory), so an aging, declining star is graded as one. (Example: a 33-year-
+old QB is untouched while a 33-year-old RB is roughly halved; a 37-year-old TE with
+a 93 Madden and falling AV scores ~0.53, not 1.0.)
 
 **Strength → blueprint → gap.** A team's unit at each position is the mean talent
 of its top *k* players, percentile-ranked vs. the 32 teams (0–100). The champion
@@ -251,8 +262,10 @@ catches up on wake), so nothing is ever hardcoded or stale.
 | Boardroom: cap-efficiency analysis | ✅ runs on live data |
 | Boardroom: ML pipeline (CV + importance) | ✅ baseline (~0.71 AUC for SB wins) |
 | Boardroom: roster-archetype clustering | ✅ runs on live data |
-| Film Room: pbp metric extraction | ✅ validated live (Super Bowl LX) |
-| Film Room: Anthropic breakdown | 🟡 wired; needs `ANTHROPIC_API_KEY` to generate |
+| Film Room: post-game (metrics + attribution + situational) | ✅ validated live (Super Bowl LX) |
+| Film Room: pre-game matchup preview (form + roster edges) | ✅ validated (2026 schedule) |
+| Film Room: every-game picker (schedule-driven, pre/post auto) | ✅ in the app |
+| Film Room: Anthropic report generation (adaptive thinking) | 🟡 wired; needs `ANTHROPIC_API_KEY` |
 | **Super Bowl Maxer** (roster → strength → needs) | ✅ live (2026 rosters, 32 teams; age/trend-adjusted) |
 | Maxer: free-agent needs recommender | ✅ live (re-derives FA pool each refresh) |
 | Maxer daily refresh (launchd) | ✅ installed & scheduled |

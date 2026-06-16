@@ -105,8 +105,110 @@ def _third_down_rate(g: pd.DataFrame) -> float | None:
     return round(float(third["first_down"].mean()), 3)
 
 
+def team_form(pbp: pd.DataFrame, team: str, through_week: int | None = None) -> dict:
+    """Season (or season-to-date) offense + defense identity for one team.
+
+    The pre-game preview compares two of these. Covers EPA/efficiency on both
+    sides of the ball plus pressure, explosives, and turnover margin.
+    """
+    df = pbp
+    if through_week is not None and "week" in df.columns:
+        df = df[df["week"] <= through_week]
+    plays = ["pass", "run"]
+    off = df[(df["posteam"] == team) & df["play_type"].isin(plays)]
+    deff = df[(df["defteam"] == team) & df["play_type"].isin(plays)]
+    games = df[(df["posteam"] == team) | (df["defteam"] == team)]["game_id"].nunique()
+    g = max(games, 1)
+
+    def mean(frame, col):
+        return round(float(frame[col].mean()), 3) if len(frame) and col in frame else None
+
+    def explosive(frame):
+        if not len(frame):
+            return None
+        ex = frame[((frame["play_type"] == "pass") & (frame["yards_gained"] >= 20)) |
+                   ((frame["play_type"] == "run") & (frame["yards_gained"] >= 10))]
+        return round(len(ex) / len(frame), 3)
+
+    def pressure(frame):
+        db = frame[frame["play_type"] == "pass"]
+        if not len(db) or not {"qb_hit", "sack"} <= set(frame.columns):
+            return None
+        return round(float((db["qb_hit"].sum() + db["sack"].sum()) / len(db)), 3)
+
+    giveaways = float(off["interception"].sum()) + (
+        float(off["fumble_lost"].sum()) if "fumble_lost" in off else 0.0)
+    takeaways = float(deff["interception"].sum()) + (
+        float(deff["fumble_lost"].sum()) if "fumble_lost" in deff else 0.0)
+
+    return {
+        "team": team, "games": int(games),
+        "off_epa_per_play": mean(off, "epa"),
+        "off_pass_epa": mean(off[off["play_type"] == "pass"], "epa"),
+        "off_rush_epa": mean(off[off["play_type"] == "run"], "epa"),
+        "off_success_rate": mean(off, "success"),
+        "off_explosive_rate": explosive(off),
+        "off_pressure_allowed": pressure(off),
+        "def_epa_allowed": mean(deff, "epa"),
+        "def_explosive_allowed": explosive(deff),
+        "def_pressure_rate": pressure(deff),
+        "giveaways_per_game": round(giveaways / g, 2),
+        "takeaways_per_game": round(takeaways / g, 2),
+    }
+
+
+def key_players(pbp: pd.DataFrame, game_id: str, team: str) -> dict:
+    """Name the players who drove (or sank) a team's game — attribution."""
+    g = pbp[(pbp["game_id"] == game_id) & (pbp["posteam"] == team)]
+    out: dict = {}
+    if "passer_player_name" in g and g["passer_player_name"].notna().any():
+        qb = g["passer_player_name"].value_counts().idxmax()
+        qbp = g[g["passer_player_name"] == qb]
+        out["qb"] = {
+            "player": qb,
+            "pass_epa": round(float(qbp["epa"].mean()), 3) if len(qbp) else None,
+            "sacks_taken": int(g["sack"].sum()) if "sack" in g else None,
+            "interceptions": int(qbp["interception"].sum()) if "interception" in qbp else None,
+        }
+    runs = g[g["play_type"] == "run"]
+    if "rusher_player_name" in runs and runs["rusher_player_name"].notna().any():
+        rb = runs["rusher_player_name"].value_counts().idxmax()
+        rbp = runs[runs["rusher_player_name"] == rb]
+        out["lead_rusher"] = {"player": rb, "carries": int(len(rbp)),
+                              "rush_epa": round(float(rbp["epa"].mean()), 3)}
+    if "receiver_player_name" in g and g["receiver_player_name"].notna().any():
+        tgt = g["receiver_player_name"].value_counts().idxmax()
+        tp = g[g["receiver_player_name"] == tgt]
+        out["top_target"] = {"player": tgt, "targets": int(len(tp)),
+                             "rec_epa": round(float(tp["epa"].mean()), 3)}
+    givers: list[str] = []
+    if "interception" in g:
+        givers += g.loc[g["interception"] == 1, "passer_player_name"].dropna().tolist()
+    if "fumble_lost" in g and "fumbled_1_player_name" in g:
+        givers += g.loc[g["fumble_lost"] == 1, "fumbled_1_player_name"].dropna().tolist()
+    if givers:
+        out["gave_it_away"] = givers
+    return out
+
+
+def _situational(pbp: pd.DataFrame, game_id: str, team: str) -> dict:
+    """By-down and by-half offensive EPA — was it script or scramble?"""
+    g = pbp[(pbp["game_id"] == game_id) & (pbp["posteam"] == team)
+            & pbp["play_type"].isin(["pass", "run"])]
+    out: dict = {}
+    if "down" in g:
+        for d in (1, 2, 3):
+            dd = g[g["down"] == d]
+            out[f"down{d}_epa"] = round(float(dd["epa"].mean()), 3) if len(dd) else None
+    if "qtr" in g:
+        fh, sh = g[g["qtr"] <= 2], g[g["qtr"] >= 3]
+        out["first_half_epa"] = round(float(fh["epa"].mean()), 3) if len(fh) else None
+        out["second_half_epa"] = round(float(sh["epa"].mean()), 3) if len(sh) else None
+    return out
+
+
 def build_breakdown_payload(pbp: pd.DataFrame, game_id: str) -> dict:
-    """Assemble the full metrics payload for a single game (both teams).
+    """Assemble the full post-game metrics payload for a single game (both teams).
 
     This dict is the input to :func:`gridiron.filmroom.breakdown.generate_breakdown`.
     """
@@ -116,6 +218,7 @@ def build_breakdown_payload(pbp: pd.DataFrame, game_id: str) -> dict:
     row = games.loc[game_id]
 
     return {
+        "mode": "post",
         "game_id": game_id,
         "week": int(row["week"]),
         "winner": row["winner"],
@@ -124,5 +227,8 @@ def build_breakdown_payload(pbp: pd.DataFrame, game_id: str) -> dict:
                   row["away_team"]: int(row["away_score"])},
         "losing_offense": team_offense_metrics(pbp, game_id, row["loser"]),
         "winning_offense": team_offense_metrics(pbp, game_id, row["winner"]),
+        "losing_key_players": key_players(pbp, game_id, row["loser"]),
+        "winning_key_players": key_players(pbp, game_id, row["winner"]),
+        "losing_situational": _situational(pbp, game_id, row["loser"]),
         "charting_metrics_pending": list(CHARTING_METRICS),
     }

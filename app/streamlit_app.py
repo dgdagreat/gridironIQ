@@ -120,52 +120,86 @@ def boardroom_tab() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Film Room
+# Film Room — every game, pre & post
 # --------------------------------------------------------------------------- #
-def film_room_tab() -> None:
-    st.subheader("Post-game film breakdown")
-    st.caption("Pulls nflfastR play-by-play, extracts tactical metrics, and asks "
-               f"`{config.ANTHROPIC_MODEL}` to explain *why a team lost*.")
+@st.cache_data(show_spinner=False)
+def _schedule(season: int) -> pd.DataFrame:
+    from gridiron.ingestion import schedules
+    return schedules.list_games(season)
 
-    st.info(
-        "This tab pulls a full season of play-by-play (~40 MB) on first use and "
-        "calls the Anthropic API, which requires `ANTHROPIC_API_KEY` in your `.env`.",
-        icon="ℹ️",
-    )
 
-    season = st.number_input("Season", min_value=1999, max_value=config.END_SEASON,
-                             value=config.END_SEASON, step=1)
+@st.cache_data(show_spinner=True)
+def _pbp(season: int):
+    from gridiron.filmroom import pbp_metrics
+    return pbp_metrics.load_pbp(int(season))
 
-    if not st.button("Load games", type="primary"):
-        return
 
+def _run_report(breakdown, payload: dict) -> None:
     try:
-        from gridiron.filmroom import pbp_metrics
-        with st.spinner(f"Loading {season} play-by-play…"):
-            pbp = pbp_metrics.load_pbp(int(season))
-            games = pbp_metrics.list_games(pbp)
-    except Exception as exc:  # noqa: BLE001 - surface any ingest error in UI
-        st.error(f"Could not load play-by-play: {exc}")
+        with st.spinner(f"Writing the report with {config.ANTHROPIC_MODEL}…"):
+            st.markdown(breakdown.generate_breakdown(payload))
+    except Exception as exc:  # noqa: BLE001 - surface API/key errors in the UI
+        st.error(f"Generation failed: {exc}")
+
+
+def film_room_tab() -> None:
+    from gridiron.filmroom import breakdown, matchup, pbp_metrics
+
+    st.subheader("Film Room — every game, pre & post")
+    st.caption("Completed games get a post-game breakdown ('why they lost'); "
+               "upcoming games get a matchup preview from form + roster edges. "
+               f"`{config.ANTHROPIC_MODEL}` writes the report (needs `ANTHROPIC_API_KEY`); "
+               "play-by-play (~40 MB/season) loads on first use.")
+
+    c1, c2 = st.columns(2)
+    season = c1.selectbox("Season", [2026, 2025, 2024, 2023], index=0)
+    try:
+        sched = _schedule(int(season))
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Could not load schedule: {exc}")
         return
+    week = c2.selectbox("Week", sorted(sched["week"].unique()), index=0)
 
-    games["label"] = games.apply(
-        lambda r: f"W{r.week}: {r.winner} def. {r.loser} "
-                  f"({r.home_team} {r.home_score}–{r.away_score} {r.away_team})", axis=1)
-    choice = st.selectbox("Game", games["label"])
-    game_id = games.loc[games["label"] == choice, "game_id"].iloc[0]
+    wk = sched[sched["week"] == week].copy()
+    wk["label"] = wk.apply(
+        lambda r: f"{r.away_team} @ {r.home_team}" + (
+            f"  ({int(r.away_score)}–{int(r.home_score)})" if r.status == "played"
+            else "  · scheduled"), axis=1)
+    game = wk[wk["label"] == st.selectbox("Game", wk["label"])].iloc[0]
 
-    payload = pbp_metrics.build_breakdown_payload(pbp, game_id)
-    with st.expander("Extracted metrics"):
-        st.json(payload)
-
-    if st.button("Generate film-room breakdown"):
-        try:
-            from gridiron.filmroom import breakdown
-            with st.spinner("Writing the breakdown…"):
-                report = breakdown.generate_breakdown(payload)
-            st.markdown(report)
-        except Exception as exc:  # noqa: BLE001
-            st.error(f"Breakdown failed: {exc}")
+    if game["status"] == "played":
+        with st.spinner(f"Loading {season} play-by-play…"):
+            pbp = _pbp(int(season))
+        payload = pbp_metrics.build_breakdown_payload(pbp, game["game_id"])
+        lo = payload["losing_offense"]
+        st.markdown(f"**{payload['winner']} def. {payload['loser']}** — "
+                    f"why {payload['loser']} lost")
+        m = st.columns(4)
+        m[0].metric(f"{payload['loser']} EPA/play", lo["epa_per_play"])
+        m[1].metric("Pass EPA", lo["pass_epa"])
+        m[2].metric("Sacks allowed", lo["sacks_allowed"])
+        m[3].metric("Turnovers", lo["turnovers"])
+        with st.expander("Extracted metrics + player attribution"):
+            st.json(payload)
+        if st.button("Generate post-game breakdown", type="primary"):
+            _run_report(breakdown, payload)
+    else:
+        form_season = int(season) - 1   # offseason: last completed season's form
+        with st.spinner(f"Loading {form_season} form…"):
+            form_pbp = _pbp(form_season)
+        strength = _roster_strength() if db.table_exists("roster_strength") else None
+        payload = matchup.build_preview_payload(
+            game["home_team"], game["away_team"], form_pbp=form_pbp,
+            form_season=form_season, week=int(game["week"]), roster_strength=strength)
+        st.markdown(f"**{game['away_team']} @ {game['home_team']}** — "
+                    f"matchup preview (form: {form_season})")
+        if payload["roster_edges"]:
+            st.caption("Biggest roster-strength edges (home − away, percentile):")
+            st.dataframe(pd.DataFrame(payload["roster_edges"]).head(6), hide_index=True)
+        with st.expander("Team form + edges"):
+            st.json(payload)
+        if st.button("Generate matchup preview", type="primary"):
+            _run_report(breakdown, payload)
 
 
 # --------------------------------------------------------------------------- #
