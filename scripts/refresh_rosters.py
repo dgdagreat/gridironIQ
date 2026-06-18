@@ -86,12 +86,12 @@ def main() -> int:
         flagged = crosscheck[crosscheck["flagged"] == 1]
         print(f"  drift vs ESPN:     {'none' if flagged.empty else ', '.join(flagged['team'])}")
     print("-" * 56)
-    print("  Closest to a champion roster:")
+    print("  Best SB outlook:")
     for _, r in league.head(5).iterrows():
-        print(f"    {r['rank']:>2}. {r['team']:<4} readiness {r['readiness']}")
+        print(f"    {r['rank']:>2}. {r['team']:<4} outlook {r['outlook']}")
     print("  Furthest:")
     for _, r in league.tail(3).iterrows():
-        print(f"    {r['rank']:>2}. {r['team']:<4} readiness {r['readiness']}")
+        print(f"    {r['rank']:>2}. {r['team']:<4} outlook {r['outlook']}")
     print("=" * 56)
     return 0
 

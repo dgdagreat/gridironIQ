@@ -6,25 +6,29 @@ correlate with winning titles; the Maxer uses that as the **importance weights**
 and a **blueprint** of how strong a contender needs to be at each position, then
 measures each current roster's weighted gap from it.
 
-    weights      ← Boardroom win-correlation (min-max scaled to [0.3, 1.0])
-    blueprint[p] = 50 + 35 · weight[p]      (be elite where it matters, ~avg where it doesn't)
-    gap[p]       = max(0, blueprint[p] − strength[p])
-    readiness    = 100 · (1 − Σ weight·gap / Σ weight·blueprint)     # 0..100
-    needs        = positions ranked by weight·gap (biggest title-relevant holes)
+    weights          ← Boardroom win-correlation (min-max scaled to [0.3, 1.0])
+    blueprint[p]     = 50 + 25 · weight[p]   (strong where it matters, ~avg where it doesn't)
+    roster_readiness = 100 · (1 − Σ weight·gap / Σ weight·blueprint)
+    outlook          = 0.55 · roster_readiness + 0.45 · organization   # headline + rank
+    needs            = positions ranked by weight·gap (biggest title-relevant holes)
 
-Everything keys off the same 11 position groups as the Boardroom, so the two
-products speak the same language.
+A pure roster grade under-rates young, well-coached teams (a recent SB participant
+can grade out as a mediocre depth chart), so the headline blends roster readiness
+with an **organizational** score — a coaching/GM/ownership proxy from recent
+franchise success (see :mod:`gridiron.modeling.organization`). The positional
+*needs* stay roster-based, since that's the actionable part.
 """
 
 from __future__ import annotations
 
 import pandas as pd
 
-from gridiron.modeling import cap_efficiency
+from gridiron.modeling import cap_efficiency, organization
 
 WEIGHT_FLOOR = 0.30          # no position is worth zero — you can't punt any of them
 BLUEPRINT_BASE = 50.0        # contender baseline percentile at the least-critical spot
-BLUEPRINT_SPAN = 35.0        # extra percentile demanded at the most-critical spot
+BLUEPRINT_SPAN = 25.0        # extra percentile demanded at the most-critical spot
+ROSTER_WEIGHT = 0.55         # outlook = roster readiness (55%) + organization (45%)
 
 
 def position_weights() -> pd.Series:
@@ -47,7 +51,10 @@ def champion_blueprint(weights: pd.Series | None = None) -> pd.Series:
 
 
 def league_table(strength: pd.DataFrame) -> pd.DataFrame:
-    """Readiness score + rank for all 32 teams (one row per team)."""
+    """Per-team SB outlook (roster readiness blended with org) + rank.
+
+    Columns: team, roster_readiness, org_score, outlook, rank.
+    """
     weights = position_weights()
     blueprint = champion_blueprint(weights)
 
@@ -56,10 +63,16 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     gap = (blueprint - wide).clip(lower=0)               # only shortfalls count
     weighted_gap = gap.mul(weights, axis=1)
     denom = float((weights * blueprint).sum())
-    readiness = (100 * (1 - weighted_gap.sum(axis=1) / denom)).round(1)
+    roster = (100 * (1 - weighted_gap.sum(axis=1) / denom)).round(1)
 
-    table = readiness.rename("readiness").reset_index()
-    table = table.sort_values("readiness", ascending=False).reset_index(drop=True)
+    table = roster.rename("roster_readiness").reset_index()
+    org = organization.franchise_strength()[["team", "org_score"]]
+    table = table.merge(org, on="team", how="left")
+    table["org_score"] = table["org_score"].fillna(50.0)
+    table["outlook"] = (ROSTER_WEIGHT * table["roster_readiness"]
+                        + (1 - ROSTER_WEIGHT) * table["org_score"]).round(1)
+
+    table = table.sort_values("outlook", ascending=False).reset_index(drop=True)
     table["rank"] = table.index + 1
     return table
 
@@ -88,7 +101,9 @@ def team_report(team: str, strength: pd.DataFrame) -> dict:
 
     return {
         "team": team,
-        "readiness": float(row["readiness"]),
+        "readiness": float(row["outlook"]),          # headline = blended outlook
+        "roster_readiness": float(row["roster_readiness"]),
+        "org_score": float(row["org_score"]),
         "rank": int(row["rank"]),
         "n_teams": int(len(table)),
         "needs": needs,

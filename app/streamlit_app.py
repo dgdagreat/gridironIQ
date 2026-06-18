@@ -248,10 +248,15 @@ def maxer_tab() -> None:
                         index=teams.index("KC") if "KC" in teams else 0)
     rep = sb_maxer.team_report(team, strength)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Championship readiness", f"{rep['readiness']:.1f}/100")
-    c2.metric("League rank", f"#{rep['rank']} of {rep['n_teams']}")
-    c3.metric("Biggest needs", ", ".join(rep["top_needs"]) or "—")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("SB outlook", f"{rep['readiness']:.1f}/100")
+    c2.metric("Roster", f"{rep['roster_readiness']:.0f}")
+    c3.metric("Organization", f"{rep['org_score']:.0f}")
+    c4.metric("League rank", f"#{rep['rank']} of {rep['n_teams']}")
+    st.caption(
+        f"Biggest needs: **{', '.join(rep['top_needs']) or '—'}**  ·  "
+        "Outlook = 55% roster talent + 45% organization "
+        "(coaching/GM/ownership proxy via recent franchise success).")
 
     needs = rep["needs"]
     left, right = st.columns([3, 2])
@@ -281,8 +286,9 @@ def maxer_tab() -> None:
         st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
 
     st.divider()
-    st.subheader("League-wide readiness")
-    st.dataframe(league[["rank", "team", "readiness"]], hide_index=True, height=320)
+    st.subheader("League-wide SB outlook")
+    st.dataframe(league[["rank", "team", "outlook", "roster_readiness", "org_score"]],
+                 hide_index=True, height=320)
     st.caption("Refresh anytime with `python scripts/refresh_rosters.py --force` "
                "(scheduled daily to track signings, trades, and cuts).")
 
