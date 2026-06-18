@@ -97,6 +97,7 @@ Requires Python 3.10+ ([`uv`](https://github.com/astral-sh/uv) recommended; nati
 ```bash
 # 1. Environment
 uv venv --python 3.11 .venv
+source .venv/bin/activate           # so `python` / `streamlit` use THIS env
 uv pip install -e .                 # installs deps + the gridiron package (editable)
 
 # 2. Build the Boardroom data layer (downloads contracts, loads SQLite)

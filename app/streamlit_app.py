@@ -11,6 +11,13 @@ Run from the project root:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Put the repo root on the path so `gridiron` imports even when the app is run
+# with a Streamlit that doesn't have the package editable-installed.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import pandas as pd
 import streamlit as st
 
@@ -98,8 +105,9 @@ def boardroom_tab() -> None:
     st.subheader("Team spending profile")
     seasons, teams = _seasons_teams()
     c1, c2 = st.columns(2)
-    team = c1.selectbox("Team", teams, index=teams.index("KC") if "KC" in teams else 0)
-    season = c2.selectbox("Season", seasons, index=0)
+    team = c1.selectbox("Team", teams, key="br_team",
+                        index=teams.index("KC") if "KC" in teams else 0)
+    season = c2.selectbox("Season", seasons, index=0, key="br_season")
     prof = _team_season(team, season)
     if prof.empty:
         st.info(f"No cap data for {team} in {season}.")
@@ -152,20 +160,20 @@ def film_room_tab() -> None:
                "play-by-play (~40 MB/season) loads on first use.")
 
     c1, c2 = st.columns(2)
-    season = c1.selectbox("Season", [2026, 2025, 2024, 2023], index=0)
+    season = c1.selectbox("Season", [2026, 2025, 2024, 2023], index=0, key="fr_season")
     try:
         sched = _schedule(int(season))
     except Exception as exc:  # noqa: BLE001
         st.error(f"Could not load schedule: {exc}")
         return
-    week = c2.selectbox("Week", sorted(sched["week"].unique()), index=0)
+    week = c2.selectbox("Week", sorted(sched["week"].unique()), index=0, key="fr_week")
 
     wk = sched[sched["week"] == week].copy()
     wk["label"] = wk.apply(
         lambda r: f"{r.away_team} @ {r.home_team}" + (
             f"  ({int(r.away_score)}–{int(r.home_score)})" if r.status == "played"
             else "  · scheduled"), axis=1)
-    game = wk[wk["label"] == st.selectbox("Game", wk["label"])].iloc[0]
+    game = wk[wk["label"] == st.selectbox("Game", wk["label"], key="fr_game")].iloc[0]
 
     if game["status"] == "played":
         with st.spinner(f"Loading {season} play-by-play…"):
@@ -221,11 +229,22 @@ def maxer_tab() -> None:
         f"**data as of {meta['data_as_of']}**"
     )
 
+    if db.table_exists("roster_crosscheck"):
+        xc = db.read_table("roster_crosscheck")
+        flagged = xc[xc["flagged"] == 1] if "flagged" in xc.columns else xc.iloc[0:0]
+        if flagged.empty:
+            st.success("Rosters match ESPN's live feed — no drift detected.", icon="✅")
+        else:
+            st.warning(
+                f"{len(flagged)} team(s) differ from ESPN's live roster "
+                f"({', '.join(flagged['team'])}). Run `python scripts/crosscheck_rosters.py` "
+                "to inspect, or `refresh_rosters.py` to re-sync.", icon="⚠️")
+
     strength = _roster_strength()
     league = sb_maxer.league_table(strength)
     teams = sorted(strength["team"].unique())
 
-    team = st.selectbox("Team", teams,
+    team = st.selectbox("Team", teams, key="mx_team",
                         index=teams.index("KC") if "KC" in teams else 0)
     rep = sb_maxer.team_report(team, strength)
 
