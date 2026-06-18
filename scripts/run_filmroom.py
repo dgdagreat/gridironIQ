@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Generate a Film Room report for any game — pre- or post-game — by game_id.
+"""Generate Film Room reports — pre- or post-game — for one game or a whole week.
 
-    python scripts/run_filmroom.py 2025_22_SEA_NE      # played   -> post-game breakdown
-    python scripts/run_filmroom.py 2026_01_NE_SEA      # scheduled-> pre-game preview
-    python scripts/run_filmroom.py 2025_22_SEA_NE --payload-only   # metrics only, no API call
+    # one game (auto-routes pre/post by schedule status)
+    python scripts/run_filmroom.py 2025_22_SEA_NE
+    python scripts/run_filmroom.py 2026_01_NE_SEA
+    python scripts/run_filmroom.py 2025_22_SEA_NE --payload-only   # metrics, no API call
 
-The report step needs ANTHROPIC_API_KEY (in .env or the environment);
-`--payload-only` prints the extracted metrics and skips the API entirely.
+    # a whole week -> writes one markdown file (reports/ is gitignored)
+    python scripts/run_filmroom.py --season 2026 --week 1
+    python scripts/run_filmroom.py --season 2026 --week 1 --out reports/wk1.md
+
+The report step needs ANTHROPIC_API_KEY (in .env or the environment).
 """
 
 from __future__ import annotations
@@ -39,17 +43,54 @@ def build_payload(game_id: str) -> dict:
         form_season=form_season, week=int(game["week"]), roster_strength=strength)
 
 
+def _run_week(season: int, week: int, out: str | None) -> int:
+    """Generate every game in a week into one markdown file."""
+    games = schedules.list_games(season, week)
+    out_path = Path(out) if out else Path("reports") / f"{season}_wk{week}_reports.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    parts, ok, failed = [], 0, 0
+    for gid in games["game_id"]:
+        try:
+            payload = build_payload(gid)
+            report = breakdown.generate_breakdown(payload)
+            parts.append(f"\n\n---\n\n## {gid} — {payload['mode']}-game\n\n{report}")
+            ok += 1
+            print(f"  [ok]   {gid}")
+        except Exception as exc:  # noqa: BLE001 - keep going on a single failure
+            failed += 1
+            print(f"  [fail] {gid}: {exc}")
+
+    header = f"# Film Room — {season} Week {week}\n\n*{ok} reports generated.*"
+    out_path.write_text(header + "".join(parts))
+    print(f"\nWrote {ok} reports ({failed} failed) -> {out_path}")
+    return 0 if failed == 0 else 1
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate a Film Room report by game_id.")
-    ap.add_argument("game_id", help="e.g. 2025_22_SEA_NE (played) or 2026_01_NE_SEA (scheduled)")
+    ap = argparse.ArgumentParser(description="Generate Film Room report(s).")
+    ap.add_argument("game_id", nargs="?",
+                    help="e.g. 2025_22_SEA_NE (played) or 2026_01_NE_SEA (scheduled)")
+    ap.add_argument("--season", type=int, help="batch: season (with --week)")
+    ap.add_argument("--week", type=int, help="batch: generate every game this week")
+    ap.add_argument("--out", help="batch: markdown output path")
     ap.add_argument("--payload-only", action="store_true",
-                    help="Print the extracted metrics and skip the API call.")
+                    help="single game: print metrics and skip the API call.")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,
         format="%(asctime)s  %(levelname)-7s  %(name)s  %(message)s", datefmt="%H:%M:%S")
+
+    if args.week is not None:
+        if args.season is None:
+            ap.error("--week requires --season")
+        print(f"Generating {args.season} Week {args.week}…")
+        return _run_week(args.season, args.week, args.out)
+
+    if not args.game_id:
+        ap.error("provide a game_id, or --season and --week for a batch")
 
     payload = build_payload(args.game_id)
     print(f"\n=== {args.game_id}  ({payload['mode']}-game) ===\n")

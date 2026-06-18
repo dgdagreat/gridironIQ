@@ -19,6 +19,9 @@ data/processed/*
 *.sqlite
 *.log
 
+# Generated Film Room reports
+reports/
+
 # Node / React
 node_modules/
 frontend/dist/
