@@ -58,18 +58,33 @@ def main() -> int:
     free_agent_pool = free_agents.score_pool(fa_raw)
     meta["n_free_agents"] = fa_meta["n_free_agents"]
 
+    # Cross-check our roster against ESPN's live feed (staleness detection).
+    # This is an audit only — it must never break the refresh.
+    try:
+        from gridiron.ingestion.espn_roster import crosscheck_rosters
+        crosscheck = crosscheck_rosters(force=args.force)
+        meta["roster_drift_teams"] = int(crosscheck["flagged"].sum())
+    except Exception as exc:  # noqa: BLE001
+        crosscheck = None
+        print(f"  [warn] ESPN cross-check skipped: {exc}")
+
     # Store the scored players (with age/trend breakdown) for transparency.
     db.write_table(player_talent_scores(players), "player_talent")
     db.write_table(strength, "roster_strength")
     db.write_table(league, "maxer_league")
     db.write_table(free_agent_pool, "free_agents")
+    if crosscheck is not None:
+        db.write_table(crosscheck, "roster_crosscheck")
     db.write_table(pd.DataFrame([meta]), "maxer_meta")
 
     print("\n" + "=" * 56)
     print(" Super Bowl Maxer — refresh complete")
     print("=" * 56)
     for k, v in meta.items():
-        print(f"  {k:16} {v}")
+        print(f"  {k:18} {v}")
+    if crosscheck is not None:
+        flagged = crosscheck[crosscheck["flagged"] == 1]
+        print(f"  drift vs ESPN:     {'none' if flagged.empty else ', '.join(flagged['team'])}")
     print("-" * 56)
     print("  Closest to a champion roster:")
     for _, r in league.head(5).iterrows():
