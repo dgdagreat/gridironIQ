@@ -175,6 +175,14 @@ def film_room_tab() -> None:
             else "  · scheduled"), axis=1)
     game = wk[wk["label"] == st.selectbox("Game", wk["label"], key="fr_game")].iloc[0]
 
+    # Loading play-by-play (~40 MB) is heavy, and st.tabs runs *every* tab on each
+    # rerun — so gate it behind a click to keep the whole app painting instantly.
+    if st.button("Load this game", type="primary", key="fr_load"):
+        st.session_state["fr_loaded"] = game["game_id"]
+    if st.session_state.get("fr_loaded") != game["game_id"]:
+        st.caption("Pick a game above and click **Load this game** to pull its data.")
+        return
+
     if game["status"] == "played":
         with st.spinner(f"Loading {season} play-by-play…"):
             pbp = _pbp(int(season))

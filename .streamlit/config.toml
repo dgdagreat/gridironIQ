@@ -1,0 +1,9 @@
+# Streamlit config for the GridironIQ app.
+
+[theme]
+base = "light"
+
+[server]
+# Skip the source-file watcher: faster startup, and avoids watcher stalls on
+# large project dirs. Restart the app to pick up code changes.
+fileWatcherType = "none"
