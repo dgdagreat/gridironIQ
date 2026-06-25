@@ -16,6 +16,8 @@ isn't buried beneath teams that merely look good on a Madden depth chart.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import pandas as pd
 
 from gridiron.ingestion import schedules
@@ -30,8 +32,12 @@ SB_APP_BONUS = 0.25
 SB_WIN_BONUS = 0.20
 
 
+@lru_cache(maxsize=2)
 def franchise_strength(weights: dict[int, float] | None = None) -> pd.DataFrame:
     """Per-team organizational score (0–100), recency-weighted.
+
+    Cached per process: it reads the schedule file and is called several times per
+    Maxer render (via league_table / team_report), so memoizing keeps the app snappy.
 
     Columns: team, win_pct (3yr), playoff_seasons, sb_apps, sb_wins, org_score.
     """
