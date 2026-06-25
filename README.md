@@ -252,6 +252,20 @@ download is cached with a TTL and re-fetchable (`--force`); each output is stamp
 `data_as_of`. A `launchd` agent runs `scripts/refresh_rosters.py` **daily** (and
 catches up on wake), so nothing is ever hardcoded or stale.
 
+**Outlook = roster + organization.** A pure talent grade under-rates young,
+well-coached teams (NE/SEA graded out low despite reaching the Super Bowl), so the
+headline **SB outlook** blends roster readiness (55%) with an **organizational
+score** (45%) — a coaching/GM/ownership proxy from recency-weighted recent success
+(win %, playoff runs, SB appearances). It also pulls paper-talent-but-losing teams
+down (a top-5 roster like NYG drops on a poor recent track record).
+
+**ESPN live cross-check + auto-fill.** Each refresh compares our nflverse roster to
+ESPN's live feed per team. Players ESPN lists that nflverse hasn't ingested yet
+(recent signings, rookies) are **auto-filled** into the roster — graded by Madden
+where mapped, a neutral fallback otherwise — so strength reflects *current* rosters
+(e.g. Brandon Aiyuk back on SF). The free-agent pool excludes ESPN-rostered players
+so it never offers a player who's already signed.
+
 ---
 
 ## Status
@@ -267,8 +281,9 @@ catches up on wake), so nothing is ever hardcoded or stale.
 | Film Room: pre-game matchup preview (form + roster edges) | ✅ validated (2026 schedule) |
 | Film Room: every-game picker (schedule-driven, pre/post auto) | ✅ in the app |
 | Film Room: Anthropic report generation (adaptive thinking) | 🟡 wired; needs `ANTHROPIC_API_KEY` |
-| **Super Bowl Maxer** (roster → strength → needs) | ✅ live (2026 rosters, 32 teams; age/trend-adjusted) |
+| **Super Bowl Maxer** — SB outlook (roster + organization) | ✅ live (2026 rosters, 32 teams; age/trend-adjusted) |
 | Maxer: free-agent needs recommender | ✅ live (re-derives FA pool each refresh) |
+| Maxer: ESPN cross-check + roster auto-fill | ✅ live (89 ESPN-only players filled) |
 | Maxer daily refresh (launchd) | ✅ installed & scheduled |
 | Streamlit app (3 tabs) | ✅ Boardroom + Maxer live; Film Room wired |
 | Charting metrics (separation, YACO) | 🟡 scaffolded (NGS/PFR pass) |

@@ -128,13 +128,14 @@ def load_av_history(base_season: int, *, force: bool = False) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # Join: who is on the roster now × how good they are
 # --------------------------------------------------------------------------- #
-def build_player_talent(season: int | None = None, *, force: bool = False
-                        ) -> tuple[pd.DataFrame, dict]:
+def build_player_talent(season: int | None = None, *, force: bool = False,
+                        augment_espn: bool = True) -> tuple[pd.DataFrame, dict]:
     """Join the live roster to talent grades; return ``(players, meta)``.
 
-    ``players`` columns: gsis_id, player, team, pos_group, depth_chart_position,
-    years_exp, madden_ovr, last_av. ``meta`` records the source seasons and the
-    ``data_as_of`` timestamp.
+    ``players`` columns: gsis_id, player, team, pos_group, age, madden_ovr,
+    last_av, source. With ``augment_espn`` (default), players ESPN lists that
+    nflverse hasn't ingested yet (recent signings, rookies) are merged in so the
+    roster is complete and current. ``meta`` records source seasons + timestamp.
     """
     roster_season, roster = load_current_roster(season, force=force)
     madden_season, madden = load_madden(season, force=force)
@@ -157,6 +158,17 @@ def build_player_talent(season: int | None = None, *, force: bool = False
     players["age"] = (
         (pd.Timestamp(year=roster_season, month=9, day=1) - birth).dt.days / 365.25
     ).round(1)
+    players["source"] = "nflverse"
+
+    # Auto-fill ESPN-only players (recent signings / rookies nflverse hasn't picked
+    # up) so the roster is complete and current; graded below by gsis_id if mapped.
+    if augment_espn:
+        try:
+            from gridiron.ingestion import espn_roster
+            extra = espn_roster.espn_only_players(force=force).assign(source="espn")
+            players = pd.concat([players, extra], ignore_index=True)
+        except Exception as exc:  # noqa: BLE001 - augmentation must not break the build
+            log.warning("ESPN roster augmentation skipped: %s", exc)
 
     grades = madden.rename(columns={"player_id": "gsis_id",
                                     "overallrating": "madden_ovr"})
@@ -176,13 +188,14 @@ def build_player_talent(season: int | None = None, *, force: bool = False
         "data_as_of": dt.datetime.now().isoformat(timespec="seconds"),
         "n_players": len(players),
         "n_graded": int(players["madden_ovr"].notna().sum()),
+        "n_espn_added": int((players["source"] == "espn").sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta
 
 
-def build_free_agent_pool(season: int | None = None, *, force: bool = False
-                          ) -> tuple[pd.DataFrame, dict]:
+def build_free_agent_pool(season: int | None = None, *, force: bool = False,
+                          augment_espn: bool = True) -> tuple[pd.DataFrame, dict]:
     """Available free agents = last season's players not on any current roster.
 
     Re-derived from the live current roster (so it stays fresh as teams sign
@@ -197,6 +210,15 @@ def build_free_agent_pool(season: int | None = None, *, force: bool = False
     signed = set(current.loc[current.get("status", "ACT").eq("ACT")
                  if "status" in current else slice(None), "gsis_id"]
                  .dropna().astype(str))
+    # Players ESPN lists as rostered aren't free agents either (keeps the FA pool
+    # consistent with the ESPN-augmented roster — e.g. don't offer Aiyuk to teams).
+    if augment_espn:
+        try:
+            from gridiron.ingestion import espn_roster
+            idmap = espn_roster.espn_to_gsis(force=force)
+            signed |= set(espn_roster.load_espn_roster()["espn_id"].map(idmap).dropna().astype(str))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ESPN FA exclusion skipped: %s", exc)
     prev_active = previous[previous.get("status", "ACT").eq("ACT")] \
         if "status" in previous else previous
     fa = prev_active[~prev_active["gsis_id"].astype(str).isin(signed)].copy()

@@ -229,16 +229,19 @@ def maxer_tab() -> None:
         f"**data as of {meta['data_as_of']}**"
     )
 
-    if db.table_exists("roster_crosscheck"):
+    n_added = meta.get("n_espn_added")
+    if n_added:
+        st.info(f"🔄 Rosters auto-filled with {int(n_added)} ESPN-listed players nflverse "
+                "hadn't ingested yet (recent signings & rookies) — strength reflects "
+                "current rosters.")
+    elif db.table_exists("roster_crosscheck"):
         xc = db.read_table("roster_crosscheck")
         flagged = xc[xc["flagged"] == 1] if "flagged" in xc.columns else xc.iloc[0:0]
         if flagged.empty:
             st.success("Rosters match ESPN's live feed — no drift detected.", icon="✅")
         else:
-            st.warning(
-                f"{len(flagged)} team(s) differ from ESPN's live roster "
-                f"({', '.join(flagged['team'])}). Run `python scripts/crosscheck_rosters.py` "
-                "to inspect, or `refresh_rosters.py` to re-sync.", icon="⚠️")
+            st.warning(f"{len(flagged)} team(s) differ from ESPN's live roster "
+                       f"({', '.join(flagged['team'])}).", icon="⚠️")
 
     strength = _roster_strength()
     league = sb_maxer.league_table(strength)

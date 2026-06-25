@@ -18,12 +18,14 @@ import datetime as dt
 import logging
 import re
 import time
+from functools import lru_cache
 
 import pandas as pd
 import requests
 
 from gridiron import config
-from gridiron.ingestion.reference import CANONICAL_TEAMS, canonical_team
+from gridiron.ingestion.reference import (
+    CANONICAL_TEAMS, canonical_team, classify_position)
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +63,12 @@ def _fnln(name) -> str:
     return parts[0] if parts else ""
 
 
+@lru_cache(maxsize=2)
 def load_espn_roster(timeout: int = 30) -> pd.DataFrame:
-    """Pull all 32 teams' current rosters from ESPN -> (team, espn_id, player, position)."""
+    """Pull all 32 teams' current rosters from ESPN (cached per process).
+
+    Columns: team (canonical), espn_id, player, position, age.
+    """
     rows: list[dict] = []
     for canon, abbr in ESPN_ABBR.items():
         try:
@@ -77,8 +83,36 @@ def load_espn_roster(timeout: int = 30) -> pd.DataFrame:
                     "espn_id": str(p.get("id")),
                     "player": p.get("fullName"),
                     "position": (p.get("position") or {}).get("abbreviation"),
+                    "age": p.get("age"),
                 })
     return pd.DataFrame(rows)
+
+
+def espn_only_players(*, force: bool = False) -> pd.DataFrame:
+    """ESPN players not on our nflverse roster — the gaps to auto-fill.
+
+    Returns rows ready to append to the talent roster: gsis_id (may be NA for
+    unmapped rookies), player, team, pos_group, age.
+    """
+    from gridiron.ingestion import rosters  # local import avoids a cycle
+
+    _, ours = rosters.load_current_roster(force=force)
+    ours = ours[ours["status"].eq("ACT")] if "status" in ours else ours
+    o_ids = set(ours["gsis_id"].dropna())
+    o_names = set(ours["full_name"].map(_norm))
+    o_fnln = set(ours["full_name"].map(_fnln))
+
+    espn = load_espn_roster().assign(
+        gsis_id=lambda d: d["espn_id"].map(espn_to_gsis(force=force)),
+        nname=lambda d: d["player"].map(_norm),
+        fnln=lambda d: d["player"].map(_fnln),
+    )
+    only = espn[~espn["gsis_id"].isin(o_ids) & ~espn["nname"].isin(o_names)
+                & ~espn["fnln"].isin(o_fnln)].copy()
+    only["pos_group"] = only["position"].map(classify_position)
+    only["age"] = pd.to_numeric(only["age"], errors="coerce")
+    only = only[only["pos_group"].ne("UNK") & only["team"].notna()]
+    return only[["gsis_id", "player", "team", "pos_group", "age"]].reset_index(drop=True)
 
 
 def espn_to_gsis(*, ttl_hours: float = 24, force: bool = False) -> dict[str, str]:
