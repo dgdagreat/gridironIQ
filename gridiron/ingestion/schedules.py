@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from functools import lru_cache
 
 import pandas as pd
 import requests
@@ -25,9 +26,15 @@ _COLS = ["game_id", "season", "game_type", "week", "gameday",
          "away_team", "home_team", "away_score", "home_score", "result", "status"]
 
 
+@lru_cache(maxsize=2)
 def load_schedules(*, force: bool = False, ttl_hours: float = DEFAULT_TTL_HOURS,
                    timeout: int = 60) -> pd.DataFrame:
-    """Return every game (past + scheduled) with a ``status`` column (cached)."""
+    """Return every game (past + scheduled) with a ``status`` column.
+
+    Memoized per process: it's read several times per app render (schedule picker
+    + the org/outlook calc), and re-parsing the file each time stalled the render.
+    The daily refresh runs in a fresh process, so it still re-fetches.
+    """
     dest = config.RAW_DIR / "games.csv"
     stale = not dest.exists() or (time.time() - dest.stat().st_mtime) / 3600 >= ttl_hours
     if stale or force:
