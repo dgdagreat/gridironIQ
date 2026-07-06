@@ -103,11 +103,18 @@ def boardroom_tab() -> None:
 
     st.divider()
     st.subheader("Team spending profile")
+    st.caption(f"Positional cap allocation by season — history from "
+               f"{config.START_SEASON}, projected out to {config.PROJECTION_SEASON} "
+               "using cap already committed on signed multi-year deals.")
     seasons, teams = _seasons_teams()
     c1, c2 = st.columns(2)
     team = c1.selectbox("Team", teams, key="br_team",
                         index=teams.index("KC") if "KC" in teams else 0)
     season = c2.selectbox("Season", seasons, index=0, key="br_season")
+    if season > config.END_SEASON:
+        st.info(f"⏳ **{season} is a projection** — only cap already tied up in "
+                "signed multi-year contracts. Rosters aren't full yet, so shares "
+                "reflect *committed* money, not a complete team.")
     prof = _team_season(team, season)
     if prof.empty:
         st.info(f"No cap data for {team} in {season}.")
@@ -210,8 +217,14 @@ def film_room_tab() -> None:
         st.markdown(f"**{game['away_team']} @ {game['home_team']}** — "
                     f"matchup preview (form: {form_season})")
         if payload["roster_edges"]:
-            st.caption("Biggest roster-strength edges (home − away, percentile):")
-            st.dataframe(pd.DataFrame(payload["roster_edges"]).head(6), hide_index=True)
+            h, a = game["home_team"], game["away_team"]
+            st.caption(f"Biggest roster-strength edges — position grades for "
+                       f"{h} (home) vs {a} (away). Edge = home − away percentile.")
+            edf = pd.DataFrame(payload["roster_edges"]).head(6)
+            edf[h] = edf["home"].map(_grade)
+            edf[a] = edf["away"].map(_grade)
+            st.dataframe(_style_grades(edf[["pos_group", h, a, "edge"]], [h, a]),
+                         hide_index=True)
         with st.expander("Team form + edges"):
             st.json(payload)
         if st.button("Generate matchup preview", type="primary"):
@@ -228,6 +241,13 @@ def _grade(pctile: float) -> str:
 #: Grade → cell background (green = strong, red = weak) so holes pop.
 _GRADE_BG = {"A": "#1a7f37", "B": "#3fb950", "C": "#bf8700",
              "D": "#d4691e", "F": "#cf222e"}
+
+
+def _style_grades(df: pd.DataFrame, cols: list[str]):
+    """Return ``df`` as a Styler with A–F grade cells shaded green→red."""
+    return df.style.map(
+        lambda v: f"background-color: {_GRADE_BG.get(v, '')}; color: white"
+        if v in _GRADE_BG else "", subset=cols)
 
 
 # --------------------------------------------------------------------------- #
@@ -300,11 +320,7 @@ def maxer_tab() -> None:
         disp.insert(1, "grade", needs["strength"].map(_grade))
         disp.insert(2, "rank", needs["pos_group"].map(
             lambda p: f"{int(team_rank.get(p, n_teams))} / {n_teams}"))
-        st.dataframe(
-            disp.style.map(
-                lambda v: f"background-color: {_GRADE_BG.get(v, '')}; color: white"
-                if v in _GRADE_BG else "", subset=["grade"]),
-            hide_index=True, height=360)
+        st.dataframe(_style_grades(disp, ["grade"]), hide_index=True, height=360)
 
     st.divider()
     st.subheader(f"Free agents to fill {team}'s needs")
@@ -325,8 +341,9 @@ def maxer_tab() -> None:
 
     st.divider()
     st.subheader("League-wide SB outlook")
-    st.dataframe(league[["rank", "team", "outlook", "roster_readiness", "org_score"]],
-                 hide_index=True, height=320)
+    lt = league[["rank", "team", "outlook", "roster_readiness", "org_score"]].copy()
+    lt.insert(2, "grade", lt["outlook"].map(_grade))
+    st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320)
     st.caption("Refresh anytime with `python scripts/refresh_rosters.py --force` "
                "(scheduled daily to track signings, trades, and cuts).")
 
