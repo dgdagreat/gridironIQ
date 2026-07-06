@@ -218,6 +218,18 @@ def film_room_tab() -> None:
             _run_report(breakdown, payload)
 
 
+def _grade(pctile: float) -> str:
+    """0–100 percentile → an A–F report-card grade."""
+    p = pctile or 0
+    return ("A" if p >= 85 else "B" if p >= 70 else "C" if p >= 45
+            else "D" if p >= 25 else "F")
+
+
+#: Grade → cell background (green = strong, red = weak) so holes pop.
+_GRADE_BG = {"A": "#1a7f37", "B": "#3fb950", "C": "#bf8700",
+             "D": "#d4691e", "F": "#cf222e"}
+
+
 # --------------------------------------------------------------------------- #
 # Super Bowl Maxer
 # --------------------------------------------------------------------------- #
@@ -279,9 +291,20 @@ def maxer_tab() -> None:
         chart = needs.set_index("pos_group")[["strength", "blueprint"]]
         st.bar_chart(chart, stack=False, height=360)
     with right:
-        st.caption("Needs, ranked by title-weighted gap.")
-        st.dataframe(needs[["pos_group", "strength", "blueprint", "gap", "priority"]],
-                     hide_index=True, height=360)
+        st.caption("Report card — grade + NFL rank per position (weakest first).")
+        ranked = strength.assign(
+            rk=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
+        n_teams = strength["team"].nunique()
+        team_rank = ranked[ranked["team"] == team].set_index("pos_group")["rk"]
+        disp = needs[["pos_group", "gap", "priority"]].copy()
+        disp.insert(1, "grade", needs["strength"].map(_grade))
+        disp.insert(2, "rank", needs["pos_group"].map(
+            lambda p: f"{int(team_rank.get(p, n_teams))} / {n_teams}"))
+        st.dataframe(
+            disp.style.map(
+                lambda v: f"background-color: {_GRADE_BG.get(v, '')}; color: white"
+                if v in _GRADE_BG else "", subset=["grade"]),
+            hide_index=True, height=360)
 
     st.divider()
     st.subheader(f"Free agents to fill {team}'s needs")
