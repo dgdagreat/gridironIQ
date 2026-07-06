@@ -272,10 +272,12 @@ def maxer_tab() -> None:
     needs = rep["needs"]
     left, right = st.columns([3, 2])
     with left:
-        st.caption("Positional strength (percentile vs. league) — bar — against "
-                   "the champion blueprint (target).")
+        st.caption("0–100 percentile scale: **strength** = this team's unit vs. the "
+                   "other 31 teams (50 = average, 100 = best), **blueprint** = the "
+                   "contender target. Grouped side by side — a bar below its target "
+                   "is a gap.")
         chart = needs.set_index("pos_group")[["strength", "blueprint"]]
-        st.bar_chart(chart, height=360)
+        st.bar_chart(chart, stack=False, height=360)
     with right:
         st.caption("Needs, ranked by title-weighted gap.")
         st.dataframe(needs[["pos_group", "strength", "blueprint", "gap", "priority"]],
