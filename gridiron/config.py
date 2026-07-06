@@ -9,6 +9,7 @@ is a *tunable* or a *segmentation marker* lives here; football reference data
 
 from __future__ import annotations
 
+import datetime as _dt
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
@@ -33,8 +34,16 @@ for _d in (DATA_DIR, RAW_DIR, PROCESSED_DIR):
 # --------------------------------------------------------------------------- #
 #: The salary cap was introduced in 1994 -- the start of the modern "cap era".
 START_SEASON: int = 1994
-#: Last season with finalized results encoded in the reference data.
+#: Last season with a finalized Super Bowl outcome -- the ceiling for any
+#: analysis that correlates spending with *winning* (champion premium, ML).
 END_SEASON: int = 2024
+#: The current NFL league year (rolls over to the new year every March).
+_TODAY = _dt.date.today()
+CURRENT_SEASON: int = _TODAY.year if _TODAY.month >= 3 else _TODAY.year - 1
+#: Contracts commit cap dollars years in advance, so positional *spending* can
+#: be projected forward even though outcomes can't. We carry committed-cap
+#: shares up to five league years past the current one.
+PROJECTION_SEASON: int = CURRENT_SEASON + 5
 
 # --------------------------------------------------------------------------- #
 # Era segmentation markers
@@ -109,6 +118,14 @@ LEAGUE_SALARY_CAP: dict[int, int | None] = {
     2023: 224_800_000,
     2024: 255_400_000,
     2025: 279_200_000,
+    # Forward projection (~7%/yr growth) so future committed-cap shares have a
+    # denominator. These are estimates, not announced caps.
+    2026: 300_000_000,
+    2027: 321_000_000,
+    2028: 343_000_000,
+    2029: 367_000_000,
+    2030: 393_000_000,
+    2031: 420_000_000,
 }
 
 # --------------------------------------------------------------------------- #

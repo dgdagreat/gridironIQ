@@ -15,7 +15,7 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from gridiron import db
+from gridiron import config, db
 from gridiron.ingestion.reference import POSITION_GROUP_ORDER
 
 RELIABLE_START = 2011
@@ -33,9 +33,11 @@ class ClusterResult:
 
 
 def cluster_archetypes(k: int = 5,
-                       min_season: int = RELIABLE_START) -> ClusterResult:
+                       min_season: int = RELIABLE_START,
+                       max_season: int = config.END_SEASON) -> ClusterResult:
     """Cluster team-seasons into ``k`` spending archetypes and score each."""
-    df = db.query("SELECT * FROM v_team_season WHERE season >= :s", s=min_season)
+    df = db.query("SELECT * FROM v_team_season WHERE season BETWEEN :lo AND :hi",
+                  lo=min_season, hi=max_season)
     X = df[FEATURE_COLS].astype(float)
 
     scaler = StandardScaler()

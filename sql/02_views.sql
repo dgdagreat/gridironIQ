@@ -42,6 +42,9 @@ SELECT
     COUNT(*)      AS n_team_seasons,
     AVG(cap_pct)  AS avg_cap_pct
 FROM positional_spending
+-- Only seasons with a played outcome; exclude forward cap projections whose
+-- partial rosters would drag the era baselines down.
+WHERE season IN (SELECT DISTINCT season FROM team_outcomes)
 GROUP BY era, pos_group;
 
 -- ---------- the headline: do champions over- or under-index by position? ----------
@@ -62,4 +65,7 @@ SELECT
     AVG(CASE WHEN sb_win = 1 THEN cap_pct_norm END) - AVG(cap_pct_norm)
                                                            AS champion_premium_norm
 FROM v_positional_long
+-- Champion premium needs finalized outcomes; forward-projection seasons carry no
+-- SB result and only partial rosters, so keep them out of this aggregate.
+WHERE season IN (SELECT DISTINCT season FROM team_outcomes)
 GROUP BY pos_group;

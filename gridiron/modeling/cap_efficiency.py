@@ -22,26 +22,32 @@ from __future__ import annotations
 
 import pandas as pd
 
-from gridiron import db
+from gridiron import config, db
 from gridiron.ingestion.reference import POSITION_GROUP_ORDER
 
 #: Source is comprehensive from the 2011 CBA onward; earlier seasons are sparse.
 RELIABLE_START = 2011
+#: Correlating spend with *winning* requires a finalized outcome, so these loaders
+#: stop at END_SEASON -- later seasons in the data are forward cap projections.
+RELIABLE_END = config.END_SEASON
 
 
-def load_team_season(min_season: int = RELIABLE_START) -> pd.DataFrame:
+def load_team_season(min_season: int = RELIABLE_START,
+                     max_season: int = RELIABLE_END) -> pd.DataFrame:
     """Return the team-season feature matrix joined to SB outcomes."""
     return db.query(
-        "SELECT * FROM v_team_season WHERE season >= :s ORDER BY season, team",
-        s=min_season,
+        "SELECT * FROM v_team_season WHERE season BETWEEN :lo AND :hi "
+        "ORDER BY season, team",
+        lo=min_season, hi=max_season,
     )
 
 
-def load_positional_long(min_season: int = RELIABLE_START) -> pd.DataFrame:
+def load_positional_long(min_season: int = RELIABLE_START,
+                         max_season: int = RELIABLE_END) -> pd.DataFrame:
     """Return tidy positional spending tagged with SB outcomes."""
     return db.query(
-        "SELECT * FROM v_positional_long WHERE season >= :s",
-        s=min_season,
+        "SELECT * FROM v_positional_long WHERE season BETWEEN :lo AND :hi",
+        lo=min_season, hi=max_season,
     )
 
 

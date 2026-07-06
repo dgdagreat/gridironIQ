@@ -24,7 +24,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from gridiron import db
+from gridiron import config, db
 from gridiron.ingestion.reference import POSITION_GROUP_ORDER
 
 RELIABLE_START = 2011
@@ -45,9 +45,11 @@ class ModelReport:
 
 
 def get_xy(target: str = "sb_appearance",
-           min_season: int = RELIABLE_START) -> tuple[pd.DataFrame, pd.Series]:
-    """Load the (X, y) matrices from ``v_team_season``."""
-    df = db.query("SELECT * FROM v_team_season WHERE season >= :s", s=min_season)
+           min_season: int = RELIABLE_START,
+           max_season: int = config.END_SEASON) -> tuple[pd.DataFrame, pd.Series]:
+    """Load the (X, y) matrices from ``v_team_season`` (labeled seasons only)."""
+    df = db.query("SELECT * FROM v_team_season WHERE season BETWEEN :lo AND :hi",
+                  lo=min_season, hi=max_season)
     X = df[FEATURE_COLS].astype(float)
     y = df[target].astype(int)
     return X, y

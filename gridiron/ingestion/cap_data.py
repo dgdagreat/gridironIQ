@@ -262,10 +262,12 @@ def build_positional_spending(player_year_caps: pd.DataFrame) -> pd.DataFrame:
     """
     df = player_year_caps.copy()
     df["pos_group"] = df["position"].map(classify_position)
-    # Clamp to the labeled analysis window: >= cap era start, <= last season with
-    # a known Super Bowl outcome. Projected future out-years would otherwise enter
-    # as incomplete rosters with no target label.
-    df = df[df["season"].between(config.START_SEASON, config.END_SEASON)]
+    # Keep the modern cap era through the projection horizon. Contracts commit
+    # cap dollars years ahead, so future out-years carry *committed* spending
+    # (partial rosters -- only players signed that far out). Outcome-based
+    # analysis re-clamps to END_SEASON downstream; retaining the future here lets
+    # the Boardroom project where teams have already tied up cap.
+    df = df[df["season"].between(config.START_SEASON, config.PROJECTION_SEASON)]
     df = df[df["team"].notna()]
 
     agg = (
