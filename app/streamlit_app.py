@@ -110,11 +110,13 @@ def boardroom_tab() -> None:
     c1, c2 = st.columns(2)
     team = c1.selectbox("Team", teams, key="br_team",
                         index=teams.index("KC") if "KC" in teams else 0)
-    season = c2.selectbox("Season", seasons, index=0, key="br_season")
-    if season > config.END_SEASON:
+    _def_season = config.CURRENT_SEASON if config.CURRENT_SEASON in seasons else seasons[0]
+    season = c2.selectbox("Season", seasons, index=seasons.index(_def_season),
+                          key="br_season")
+    if season > config.CURRENT_SEASON:
         st.info(f"⏳ **{season} is a projection** — only cap already tied up in "
-                "signed multi-year contracts. Rosters aren't full yet, so shares "
-                "reflect *committed* money, not a complete team.")
+                "signed multi-year contracts. Rosters aren't full this far out, so "
+                "shares reflect *committed* money, not a complete team.")
     prof = _team_season(team, season)
     if prof.empty:
         st.info(f"No cap data for {team} in {season}.")
