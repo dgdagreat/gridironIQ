@@ -242,8 +242,10 @@ Boardroom win-importance (be elite at QB/TE/EDGE, merely adequate at RB/LB). The
 not on any current roster* — so it re-derives every refresh as teams sign people.
 The pool is scored with the same age/trend-adjusted talent model, and for each of
 a team's top needs the best available players are surfaced (e.g. an aging WR with
-a high Madden but falling production ranks below a younger riser). It's a concrete
-shopping list, not just a diagnosis.
+a high Madden but falling production ranks below a younger riser). Each suggestion
+carries an **estimated cost** (the player's most recent contract APY), so a
+cheap-but-solid target (Keenan Allen ~$3M) stands out next to a pricey name (Deebo
+~$24M). It's a concrete shopping list, not just a diagnosis.
 
 **Freshness is the whole point.** Rosters are pulled live from nflverse (so trades,
 cuts, and signings appear), grades from the maintained

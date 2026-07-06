@@ -244,6 +244,10 @@ def build_free_agent_pool(season: int | None = None, *, force: bool = False,
     fa = fa.merge(load_av_history(madden_season, force=force), on="gsis_id", how="left")
     fa["last_av"] = fa["av0"]
 
+    # Estimated market cost = the player's most recent contract APY ($M).
+    from gridiron.ingestion import cap_data
+    fa["est_apy"] = fa["gsis_id"].map(cap_data.latest_apy())
+
     # Keep only players with a real signal (a grade or recent production) — drops
     # the long tail of camp bodies / retirees with no data.
     fa = fa[fa["pos_group"].ne("UNK")]

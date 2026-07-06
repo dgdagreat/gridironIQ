@@ -289,10 +289,12 @@ def maxer_tab() -> None:
             st.caption("No clear free-agent upgrades at the top needs right now.")
         else:
             st.caption("Best available players (not on a current roster) at each "
-                       "top need, ranked by the same age/trend-adjusted talent.")
-            st.dataframe(recs, hide_index=True,
-                         column_config={"madden_ovr": st.column_config.NumberColumn(format="%.0f"),
-                                        "age": st.column_config.NumberColumn(format="%.1f")})
+                       "top need, ranked by age/trend-adjusted talent — with each "
+                       "player's estimated cost (most recent contract APY).")
+            st.dataframe(recs, hide_index=True, column_config={
+                "madden_ovr": st.column_config.NumberColumn(format="%.0f"),
+                "age": st.column_config.NumberColumn(format="%.1f"),
+                "est_apy_$m": st.column_config.NumberColumn("est. $/yr (M)", format="$%.1f")})
     else:
         st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
 

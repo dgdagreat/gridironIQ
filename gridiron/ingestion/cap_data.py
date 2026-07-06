@@ -78,6 +78,18 @@ def load_raw_contracts(force_download: bool = False) -> pd.DataFrame:
     return pd.read_csv(path, compression="gzip", low_memory=False)
 
 
+def latest_apy() -> pd.Series:
+    """Most-recent real contract APY per player: ``gsis_id -> $M``.
+
+    A market proxy for what a free agent would cost. Uses each player's latest
+    signed deal, dropping the source's ``year_signed == 0`` sentinel rows.
+    """
+    c = load_raw_contracts()
+    c = c[(pd.to_numeric(c["year_signed"], errors="coerce") > 0) & c["gsis_id"].notna()]
+    latest = c.sort_values("year_signed").groupby("gsis_id").tail(1)
+    return latest.set_index("gsis_id")["apy"]
+
+
 # --------------------------------------------------------------------------- #
 # Stage 2 -- explode the nested per-year cap detail
 # --------------------------------------------------------------------------- #

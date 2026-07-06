@@ -36,6 +36,7 @@ def recommend_for_team(team: str, strength: pd.DataFrame, pool: pd.DataFrame, *,
         cands = (pool[pool["pos_group"] == need.pos_group]
                  .nlargest(per_need, "talent"))
         for c in cands.itertuples(index=False):
+            apy = getattr(c, "est_apy", None)
             rows.append({
                 "need": need.pos_group,
                 "gap": round(float(need.gap), 1),
@@ -44,6 +45,7 @@ def recommend_for_team(team: str, strength: pd.DataFrame, pool: pd.DataFrame, *,
                 "age": getattr(c, "age", None),
                 "madden_ovr": getattr(c, "madden_ovr", None),
                 "talent": round(float(c.talent), 3),
+                "est_apy_$m": round(float(apy), 1) if pd.notna(apy) else None,
             })
     return pd.DataFrame(rows)
 
