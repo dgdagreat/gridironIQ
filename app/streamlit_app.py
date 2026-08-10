@@ -22,7 +22,8 @@ import pandas as pd
 import streamlit as st
 
 from gridiron import config, db
-from gridiron.modeling import cap_efficiency, clustering, free_agents, sb_maxer
+from gridiron.modeling import (cap_efficiency, clustering, free_agents, sb_maxer,
+                               value_board)
 
 st.set_page_config(page_title="GridironIQ", page_icon="🏈", layout="wide")
 
@@ -123,7 +124,12 @@ def boardroom_tab() -> None:
     else:
         left, right = st.columns([3, 2])
         left.bar_chart(prof.set_index("pos_group")["cap_pct_norm"], height=340)
-        right.dataframe(prof, hide_index=True, height=340)
+        right.dataframe(prof, hide_index=True, height=340, column_config={
+            "pos_group": st.column_config.TextColumn("pos"),
+            "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
+            "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+            "n_players": st.column_config.NumberColumn("players"),
+        })
 
     st.divider()
     st.subheader("Winning roster archetypes (k-means on spending profiles)")
@@ -306,10 +312,9 @@ def maxer_tab() -> None:
     needs = rep["needs"]
     left, right = st.columns([3, 2])
     with left:
-        st.caption("0–100 percentile scale: **strength** = this team's unit vs. the "
-                   "other 31 teams (50 = average, 100 = best), **blueprint** = the "
-                   "contender target. Grouped side by side — a bar below its target "
-                   "is a gap.")
+        st.caption("**Strength** = this unit's percentile vs. the league (50 = avg, "
+                   "100 = best); **blueprint** = the contender target. A bar below "
+                   "its target is a gap.")
         chart = needs.set_index("pos_group")[["strength", "blueprint"]]
         st.bar_chart(chart, stack=False, height=360)
     with right:
@@ -322,7 +327,12 @@ def maxer_tab() -> None:
         disp.insert(1, "grade", needs["strength"].map(_grade))
         disp.insert(2, "rank", needs["pos_group"].map(
             lambda p: f"{int(team_rank.get(p, n_teams))} / {n_teams}"))
-        st.dataframe(_style_grades(disp, ["grade"]), hide_index=True, height=360)
+        st.dataframe(_style_grades(disp, ["grade"]), hide_index=True, height=360,
+                     column_config={
+                         "pos_group": st.column_config.TextColumn("pos"),
+                         "gap": st.column_config.NumberColumn("gap", format="%.0f"),
+                         "priority": st.column_config.NumberColumn("priority", format="%.0f"),
+                     })
 
     st.divider()
     st.subheader(f"Free agents to fill {team}'s needs")
@@ -345,9 +355,69 @@ def maxer_tab() -> None:
     st.subheader("League-wide SB outlook")
     lt = league[["rank", "team", "outlook", "roster_readiness", "org_score"]].copy()
     lt.insert(2, "grade", lt["outlook"].map(_grade))
-    st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320)
+    st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320,
+                 column_config={
+                     "outlook": st.column_config.NumberColumn("outlook", format="%.0f"),
+                     "roster_readiness": st.column_config.NumberColumn("roster", format="%.0f"),
+                     "org_score": st.column_config.NumberColumn("org", format="%.0f"),
+                 })
     st.caption("Refresh anytime with `python scripts/refresh_rosters.py --force` "
                "(scheduled daily to track signings, trades, and cuts).")
+
+
+# --------------------------------------------------------------------------- #
+# Value Board
+# --------------------------------------------------------------------------- #
+@st.cache_data(show_spinner=False)
+def _value_board() -> pd.DataFrame:
+    """Value board — from the precomputed table if present, else built live."""
+    if db.table_exists("value_board"):
+        return db.read_table("value_board")
+    return value_board.build_value_board(db.read_table("player_talent"))
+
+
+_VALUE_COLS = {
+    "pos_group": st.column_config.TextColumn("pos"),
+    "madden_ovr": st.column_config.NumberColumn("OVR"),
+    "apy": st.column_config.NumberColumn("$/yr", format="$%.1fM"),
+    "value": st.column_config.TextColumn("value"),
+}
+
+
+def _fmt_value(df: pd.DataFrame) -> pd.DataFrame:
+    out = df[["player", "team", "pos_group", "grade", "age", "madden_ovr",
+              "apy", "value"]].copy()
+    for col in ("madden_ovr", "age"):
+        out[col] = out[col].round(0).astype("Int64")
+    out["value"] = out["value"].map(lambda s: "★" * int(s) + "☆" * (5 - int(s)))
+    return out
+
+
+def value_tab() -> None:
+    st.subheader("💎 Value Board — the best (and worst) contracts in football")
+    st.caption("**Value index = caliber percentile − pay percentile**, within a "
+               "position. +80 = a top-of-position talent on bottom-of-position "
+               "money. Caliber = Madden rating; pay = contract APY (OverTheCap).")
+    if not db.table_exists("player_talent"):
+        st.info("Run `python scripts/refresh_rosters.py` to build the roster first.")
+        return
+    board = _value_board()
+
+    c1, c2 = st.columns([1, 3])
+    positions = ["All"] + sorted(board["pos_group"].unique())
+    pos = c1.selectbox("Position", positions, key="vb_pos")
+    n = c1.slider("How many", 10, 40, 25, key="vb_n")
+    c1.caption("Sorted by value index; ★ = league-wide value tier.")
+
+    best = value_board.best_values(board, pos_group=pos, n=n)
+    c2.caption(f"**Best values{'' if pos == 'All' else ' — ' + pos}** — good player, cheap deal.")
+    c2.dataframe(_style_grades(_fmt_value(best), ["grade"]), hide_index=True,
+                 height=520, column_config=_VALUE_COLS)
+
+    with st.expander("💸 Worst contracts — biggest overpays (well-paid, underdelivering)"):
+        st.dataframe(_style_grades(_fmt_value(value_board.worst_contracts(board, n=15)),
+                                   ["grade"]), hide_index=True, column_config=_VALUE_COLS)
+    st.caption("Rebuilt on each `python scripts/refresh_rosters.py` (scheduled daily).")
 
 
 # --------------------------------------------------------------------------- #
@@ -355,10 +425,11 @@ def maxer_tab() -> None:
 # --------------------------------------------------------------------------- #
 st.title("🏈 GridironIQ")
 st.caption(THESIS)
-boardroom, film_room, maxer = st.tabs([
+boardroom, film_room, maxer, value = st.tabs([
     "📊 Boardroom — Cap Efficiency",
     "🎬 Film Room — Post-Game Breakdown",
     "🏆 Super Bowl Maxer",
+    "💎 Value Board",
 ])
 with boardroom:
     boardroom_tab()
@@ -366,3 +437,5 @@ with film_room:
     film_room_tab()
 with maxer:
     maxer_tab()
+with value:
+    value_tab()
