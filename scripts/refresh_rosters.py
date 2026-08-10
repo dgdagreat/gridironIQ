@@ -24,7 +24,7 @@ import pandas as pd  # noqa: E402
 from gridiron import db  # noqa: E402
 from gridiron.ingestion.rosters import (  # noqa: E402
     build_free_agent_pool, build_player_talent)
-from gridiron.modeling import free_agents  # noqa: E402
+from gridiron.modeling import free_agents, value_board  # noqa: E402
 from gridiron.modeling.roster_strength import (  # noqa: E402
     compute_unit_strength, player_talent_scores)
 from gridiron.modeling.sb_maxer import league_table  # noqa: E402
@@ -50,8 +50,11 @@ def main() -> int:
         return 1
 
     players, meta = build_player_talent(args.season, force=args.force)
+    scored = player_talent_scores(players)
     strength = compute_unit_strength(players)
     league = league_table(strength)
+    board = value_board.build_value_board(scored)
+    meta["n_value_board"] = len(board)
 
     # Available free agents (last season's players not on a current roster).
     fa_raw, fa_meta = build_free_agent_pool(args.season, force=args.force)
@@ -69,10 +72,11 @@ def main() -> int:
         print(f"  [warn] ESPN cross-check skipped: {exc}")
 
     # Store the scored players (with age/trend breakdown) for transparency.
-    db.write_table(player_talent_scores(players), "player_talent")
+    db.write_table(scored, "player_talent")
     db.write_table(strength, "roster_strength")
     db.write_table(league, "maxer_league")
     db.write_table(free_agent_pool, "free_agents")
+    db.write_table(board, "value_board")
     if crosscheck is not None:
         db.write_table(crosscheck, "roster_crosscheck")
     db.write_table(pd.DataFrame([meta]), "maxer_meta")

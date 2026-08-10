@@ -173,6 +173,9 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     grades = madden.rename(columns={"player_id": "gsis_id",
                                     "overallrating": "madden_ovr"})
     grades = grades[["gsis_id", "madden_ovr"]].dropna(subset=["gsis_id"]).drop_duplicates("gsis_id")
+    # Madden overall is an integer scale; the source ships averaged/interpolated
+    # fractions for ~25% of players -- round back to a whole rating.
+    grades["madden_ovr"] = grades["madden_ovr"].round()
     players = players.merge(grades, on="gsis_id", how="left")
 
     # 3-season AV history (production trend); last_av = most recent season.
@@ -240,6 +243,7 @@ def build_free_agent_pool(season: int | None = None, *, force: bool = False,
     grades = madden.rename(columns={"player_id": "gsis_id",
                                     "overallrating": "madden_ovr"})
     grades = grades[["gsis_id", "madden_ovr"]].dropna(subset=["gsis_id"]).drop_duplicates("gsis_id")
+    grades["madden_ovr"] = grades["madden_ovr"].round()  # integer Madden scale
     fa = fa.merge(grades, on="gsis_id", how="left")
     fa = fa.merge(load_av_history(madden_season, force=force), on="gsis_id", how="left")
     fa["last_av"] = fa["av0"]
