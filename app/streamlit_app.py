@@ -261,32 +261,33 @@ def _style_grades(df: pd.DataFrame, cols: list[str]):
 # --------------------------------------------------------------------------- #
 # Interactive football field (the Maxer's headline visual)
 # --------------------------------------------------------------------------- #
-#: An 11-personnel offense (driving right) lined up opposite a base 4-3 defense.
-#: Each spot is a labeled box colored by its position **group** grade — several
-#: boxes can share a group (all five O-line spots take the OL grade). Tuple is
-#: ``(label, group, x, y)`` on the field (x: 0–100 yards; y: 0–53.3 width).
+#: The base personnel most NFL teams actually run — **11-personnel shotgun**
+#: offense (1 RB, 1 TE, 3 WR) against a **nickel** defense (4 down, 2 LB, 5 DB),
+#: drawn vertically (offense at the bottom, driving up). Each spot is a labeled
+#: box colored by its position **group** grade; several boxes can share a group.
+#: Coordinates are ``(label, group, x, y)`` with x = field width (0–53.3) and
+#: y = field length (offense LOS ≈ 44).
 _FORMATION: list[tuple[str, str, float, float]] = [
-    # OFFENSE — line at the ball, skill players around it
-    ("WR", "WR", 46, 49), ("WR", "WR", 46, 4.5), ("WR", "WR", 43, 39),
-    ("LT", "OL", 47, 34.5), ("LG", "OL", 47, 30.5), ("C", "OL", 47, 26.5),
-    ("RG", "OL", 47, 22.5), ("RT", "OL", 47, 18.5),
-    ("TE", "TE", 47, 13.5),
-    ("QB", "QB", 42, 26.5), ("RB", "RB", 37, 24),
-    # DEFENSE — 4 down linemen, 3 linebackers, 4 in coverage
-    ("DE", "EDGE", 53, 33.5), ("DT", "IDL", 53, 29), ("DT", "IDL", 53, 24),
-    ("DE", "EDGE", 53, 19.5),
-    ("LB", "LB", 59, 33), ("LB", "LB", 59, 26.5), ("LB", "LB", 59, 20),
-    ("CB", "CB", 64, 49), ("CB", "CB", 64, 4.5),
-    ("FS", "S", 72, 32), ("SS", "S", 73, 21),
+    # OFFENSE — shotgun 11 personnel, driving up
+    ("WR", "WR", 3, 42.5), ("WR", "WR", 50, 42.5), ("WR", "WR", 10, 41),
+    ("LT", "OL", 16, 44), ("LG", "OL", 21, 44), ("C", "OL", 26.5, 44),
+    ("RG", "OL", 32, 44), ("RT", "OL", 37, 44),
+    ("TE", "TE", 42, 44),
+    ("QB", "QB", 25, 38), ("RB", "RB", 31, 38),
+    # DEFENSE — nickel (4-2-5)
+    ("DE", "EDGE", 15, 47), ("DT", "IDL", 22, 47), ("DT", "IDL", 31, 47),
+    ("DE", "EDGE", 38, 47),
+    ("LB", "LB", 21, 51), ("LB", "LB", 32, 51),
+    ("CB", "CB", 3, 47), ("CB", "CB", 50, 47), ("NB", "CB", 11, 50),
+    ("FS", "S", 18, 58), ("SS", "S", 35, 58),
 ]
 
 
-def _field_figure(team: str, strength: pd.DataFrame):
-    """Plotly formation view: an offense-vs-defense alignment of labeled player
-    boxes, each shaded by its position **group** grade (green strong → red weak).
-
-    Returns ``(figure, order)`` — ``order[i]`` is the group of box ``i``, so a
-    click event's point index maps straight back to a position group.
+def _field_figure(team: str, strength: pd.DataFrame, highlight: str | None = None):
+    """Plotly formation view (vertical): the base personnel most teams run —
+    11-personnel offense (bottom) vs. a nickel defense (top) — as labeled player
+    boxes shaded by their position **group** grade (green strong → red weak).
+    Boxes belonging to the ``highlight`` group get a bright gold ring.
     """
     import plotly.graph_objects as go
     rs = strength[strength["team"] == team].set_index("pos_group")
@@ -296,19 +297,20 @@ def _field_figure(team: str, strength: pd.DataFrame):
     n = int(strength["team"].nunique())
 
     fig = go.Figure()
-    fig.add_shape(type="rect", x0=0, x1=100, y0=0, y1=53.3, layer="below",
+    fig.add_shape(type="rect", x0=0, x1=53.3, y0=-10, y1=110, layer="below",
                   fillcolor="#2f8f4e", line_width=0)
-    for x0, x1 in ((-10, 0), (100, 110)):                    # end zones
-        fig.add_shape(type="rect", x0=x0, x1=x1, y0=0, y1=53.3, layer="below",
+    for y0, y1 in ((-10, 0), (100, 110)):                    # end zones
+        fig.add_shape(type="rect", x0=0, x1=53.3, y0=y0, y1=y1, layer="below",
                       fillcolor="#1c6135", line_width=0)
     for yd in range(0, 101, 5):                              # yard lines (every 5)
-        fig.add_shape(type="line", x0=yd, x1=yd, y0=0, y1=53.3, layer="below",
+        fig.add_shape(type="line", x0=0, x1=53.3, y0=yd, y1=yd, layer="below",
                       line=dict(color="rgba(255,255,255,0.30)",
                                 width=2 if yd % 10 == 0 else 1))
-    fig.add_shape(type="line", x0=50, x1=50, y0=0, y1=53.3, layer="below",
-                  line=dict(color="rgba(255,255,255,0.85)", width=2))
+    fig.add_shape(type="line", x0=0, x1=53.3, y0=44, y1=44, layer="below",
+                  line=dict(color="rgba(255,255,255,0.85)", width=2))  # line of scrimmage
 
-    xs, ys, texts, colors, hovers, order = [], [], [], [], [], []
+    xs, ys, texts, colors, hovers = [], [], [], [], []
+    lcolors, lwidths, sizes = [], [], []
     for label, grp, x, y in _FORMATION:
         if grp in rs.index:
             s = float(rs.at[grp, "strength"]); g = _grade(s); rk = int(tr.get(grp, n))
@@ -319,35 +321,27 @@ def _field_figure(team: str, strength: pd.DataFrame):
         else:
             colors.append("#8a8a8a")
             hovers.append(f"{label} · {grp} · no data")
-        xs.append(x); ys.append(y); texts.append(label); order.append(grp)
+        hot = grp == highlight
+        lcolors.append("#ffe14d" if hot else "white")
+        lwidths.append(3.5 if hot else 1.4)
+        sizes.append(29 if hot else 23)
+        xs.append(x); ys.append(y); texts.append(label)
     fig.add_trace(go.Scatter(
         x=xs, y=ys, mode="markers+text", text=texts, textposition="middle center",
         textfont=dict(color="white", size=9, family="Arial Black"),
-        marker=dict(symbol="square", size=25, color=colors,
-                    line=dict(color="white", width=1.5)),
-        hovertext=hovers, hoverinfo="text", customdata=order))
-    for x, lab in ((25, "◄ OFFENSE"), (75, "DEFENSE ►")):
-        fig.add_annotation(x=x, y=50.5, text=lab, showarrow=False,
+        marker=dict(symbol="square", size=sizes, color=colors,
+                    line=dict(color=lcolors, width=lwidths)),
+        hovertext=hovers, hoverinfo="text"))
+    for y, lab in ((33.5, "▼ OFFENSE"), (63, "▲ DEFENSE")):
+        fig.add_annotation(x=26.5, y=y, text=lab, showarrow=False,
                            font=dict(color="rgba(255,255,255,0.9)", size=12,
                                      family="Arial Black"))
-    fig.update_xaxes(visible=False, range=[-11, 111], fixedrange=True)
-    fig.update_yaxes(visible=False, range=[-2, 55], fixedrange=True)
-    fig.update_layout(height=470, showlegend=False, dragmode=False,
+    fig.update_xaxes(visible=False, range=[-2, 55], fixedrange=True)
+    fig.update_yaxes(visible=False, range=[31, 66], fixedrange=True)
+    fig.update_layout(height=560, showlegend=False, dragmode=False,
                       margin=dict(l=0, r=0, t=4, b=4),
                       plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    return fig, order
-
-
-def _picked_position(selection, order: list[str]) -> str | None:
-    """Resolve a Plotly click event into the position group that was clicked."""
-    try:
-        pts = (selection or {}).get("selection", {}).get("points", [])
-        if not pts:
-            return None
-        i = pts[0].get("point_index", pts[0].get("point_number"))
-        return order[i] if i is not None and 0 <= i < len(order) else None
-    except Exception:  # noqa: BLE001 - a bad selection just means "nothing picked"
-        return None
+    return fig
 
 
 def _position_detail(pos: str, team: str, strength: pd.DataFrame) -> None:
@@ -435,20 +429,20 @@ def maxer_tab() -> None:
 
     needs = rep["needs"]
     st.markdown("##### 🏟️ Your roster, on the field")
-    st.caption("Your **offense** (left) lined up against a base **defense** (right). "
-               "Every box is a player spot, shaded by its unit's grade "
-               "(green strong → red weak). Hover for detail; **click a spot** to fix it.")
-    fig, order = _field_figure(team, strength)
-    sel = st.plotly_chart(fig, use_container_width=True, on_select="rerun",
-                          key=f"field_{team}")
-    picked = _picked_position(sel, order) or (rep["top_needs"][0] if rep["top_needs"] else None)
+    st.caption("The base most teams actually run — **11-personnel** offense (bottom) "
+               "vs. a **nickel** defense (top). Each box is a player spot, shaded by "
+               "its unit's grade (green strong → red weak); hover any box for detail.")
+    units = list(needs["pos_group"])            # weakest first
+    picked = st.selectbox("🔍 Break down a unit (weakest first)", units,
+                          key=f"mx_pick_{team}")
+    fc = st.columns([1, 2, 1])
+    with fc[1]:
+        st.plotly_chart(_field_figure(team, strength, highlight=picked),
+                        use_container_width=True, key=f"field_{team}")
 
     left, right = st.columns([3, 2])
     with left:
-        if picked:
-            _position_detail(picked, team, strength)
-        else:
-            st.caption("Click a position on the field to drill in.")
+        _position_detail(picked, team, strength)
     with right:
         st.caption("Report card — weakest first.")
         ranked = strength.assign(
