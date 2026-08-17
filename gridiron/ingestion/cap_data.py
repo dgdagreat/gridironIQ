@@ -86,7 +86,10 @@ def latest_apy() -> pd.Series:
     """
     c = load_raw_contracts()
     c = c[(pd.to_numeric(c["year_signed"], errors="coerce") > 0) & c["gsis_id"].notna()]
-    latest = c.sort_values("year_signed").groupby("gsis_id").tail(1)
+    # Take the latest signing year, and within it the highest APY -- players often
+    # have several rows for the same year (restructures / cap-adjusted figures);
+    # the top-line APY is the real deal (else e.g. Lamar Jackson reads $32M not $52M).
+    latest = c.sort_values(["year_signed", "apy"]).groupby("gsis_id").tail(1)
     return latest.set_index("gsis_id")["apy"]
 
 

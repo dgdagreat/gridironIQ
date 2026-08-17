@@ -35,7 +35,7 @@ TEAM_ALIASES: dict[str, str] = {
     "GNB": "GB", "KAN": "KC", "NWE": "NE", "NOR": "NO", "SFO": "SF",
     "TAM": "TB", "JAC": "JAX", "NWE ": "NE",
     "WFT": "WAS", "WSH": "WAS",          # Washington Football Team / variants
-    "ARZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU",
+    "ARZ": "ARI", "AZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU",
 }
 
 
