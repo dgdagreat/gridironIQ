@@ -259,6 +259,130 @@ def _style_grades(df: pd.DataFrame, cols: list[str]):
 
 
 # --------------------------------------------------------------------------- #
+# Interactive football field (the Maxer's headline visual)
+# --------------------------------------------------------------------------- #
+#: An 11-personnel offense (driving right) lined up opposite a base 4-3 defense.
+#: Each spot is a labeled box colored by its position **group** grade — several
+#: boxes can share a group (all five O-line spots take the OL grade). Tuple is
+#: ``(label, group, x, y)`` on the field (x: 0–100 yards; y: 0–53.3 width).
+_FORMATION: list[tuple[str, str, float, float]] = [
+    # OFFENSE — line at the ball, skill players around it
+    ("WR", "WR", 46, 49), ("WR", "WR", 46, 4.5), ("WR", "WR", 43, 39),
+    ("LT", "OL", 47, 34.5), ("LG", "OL", 47, 30.5), ("C", "OL", 47, 26.5),
+    ("RG", "OL", 47, 22.5), ("RT", "OL", 47, 18.5),
+    ("TE", "TE", 47, 13.5),
+    ("QB", "QB", 42, 26.5), ("RB", "RB", 37, 24),
+    # DEFENSE — 4 down linemen, 3 linebackers, 4 in coverage
+    ("DE", "EDGE", 53, 33.5), ("DT", "IDL", 53, 29), ("DT", "IDL", 53, 24),
+    ("DE", "EDGE", 53, 19.5),
+    ("LB", "LB", 59, 33), ("LB", "LB", 59, 26.5), ("LB", "LB", 59, 20),
+    ("CB", "CB", 64, 49), ("CB", "CB", 64, 4.5),
+    ("FS", "S", 72, 32), ("SS", "S", 73, 21),
+]
+
+
+def _field_figure(team: str, strength: pd.DataFrame):
+    """Plotly formation view: an offense-vs-defense alignment of labeled player
+    boxes, each shaded by its position **group** grade (green strong → red weak).
+
+    Returns ``(figure, order)`` — ``order[i]`` is the group of box ``i``, so a
+    click event's point index maps straight back to a position group.
+    """
+    import plotly.graph_objects as go
+    rs = strength[strength["team"] == team].set_index("pos_group")
+    ranked = strength.assign(
+        rk=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
+    tr = ranked[ranked["team"] == team].set_index("pos_group")["rk"]
+    n = int(strength["team"].nunique())
+
+    fig = go.Figure()
+    fig.add_shape(type="rect", x0=0, x1=100, y0=0, y1=53.3, layer="below",
+                  fillcolor="#2f8f4e", line_width=0)
+    for x0, x1 in ((-10, 0), (100, 110)):                    # end zones
+        fig.add_shape(type="rect", x0=x0, x1=x1, y0=0, y1=53.3, layer="below",
+                      fillcolor="#1c6135", line_width=0)
+    for yd in range(0, 101, 5):                              # yard lines (every 5)
+        fig.add_shape(type="line", x0=yd, x1=yd, y0=0, y1=53.3, layer="below",
+                      line=dict(color="rgba(255,255,255,0.30)",
+                                width=2 if yd % 10 == 0 else 1))
+    fig.add_shape(type="line", x0=50, x1=50, y0=0, y1=53.3, layer="below",
+                  line=dict(color="rgba(255,255,255,0.85)", width=2))
+
+    xs, ys, texts, colors, hovers, order = [], [], [], [], [], []
+    for label, grp, x, y in _FORMATION:
+        if grp in rs.index:
+            s = float(rs.at[grp, "strength"]); g = _grade(s); rk = int(tr.get(grp, n))
+            top = rs.at[grp, "top_player"] if "top_player" in rs.columns else ""
+            colors.append(_GRADE_BG[g])
+            hovers.append(f"<b>{label}</b> · {grp} unit · grade {g}<br>"
+                          f"#{rk} of {n} in the NFL · strength {s:.0f}/100<br>top: {top}")
+        else:
+            colors.append("#8a8a8a")
+            hovers.append(f"{label} · {grp} · no data")
+        xs.append(x); ys.append(y); texts.append(label); order.append(grp)
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys, mode="markers+text", text=texts, textposition="middle center",
+        textfont=dict(color="white", size=9, family="Arial Black"),
+        marker=dict(symbol="square", size=25, color=colors,
+                    line=dict(color="white", width=1.5)),
+        hovertext=hovers, hoverinfo="text", customdata=order))
+    for x, lab in ((25, "◄ OFFENSE"), (75, "DEFENSE ►")):
+        fig.add_annotation(x=x, y=50.5, text=lab, showarrow=False,
+                           font=dict(color="rgba(255,255,255,0.9)", size=12,
+                                     family="Arial Black"))
+    fig.update_xaxes(visible=False, range=[-11, 111], fixedrange=True)
+    fig.update_yaxes(visible=False, range=[-2, 55], fixedrange=True)
+    fig.update_layout(height=470, showlegend=False, dragmode=False,
+                      margin=dict(l=0, r=0, t=4, b=4),
+                      plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    return fig, order
+
+
+def _picked_position(selection, order: list[str]) -> str | None:
+    """Resolve a Plotly click event into the position group that was clicked."""
+    try:
+        pts = (selection or {}).get("selection", {}).get("points", [])
+        if not pts:
+            return None
+        i = pts[0].get("point_index", pts[0].get("point_number"))
+        return order[i] if i is not None and 0 <= i < len(order) else None
+    except Exception:  # noqa: BLE001 - a bad selection just means "nothing picked"
+        return None
+
+
+def _position_detail(pos: str, team: str, strength: pd.DataFrame) -> None:
+    """Drill-down card for one position: grade, NFL rank, and best free agents."""
+    rs = strength[(strength["team"] == team) & (strength["pos_group"] == pos)]
+    n = int(strength["team"].nunique())
+    ranked = strength.assign(
+        rk=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
+    s = float(rs["strength"].iloc[0]) if not rs.empty else 0.0
+    g = _grade(s)
+    rk = (int(ranked[(ranked["team"] == team) & (ranked["pos_group"] == pos)]["rk"].iloc[0])
+          if not rs.empty else n)
+    top = rs["top_player"].iloc[0] if (not rs.empty and "top_player" in rs.columns) else "—"
+    color = _GRADE_BG.get(g, "#888")
+    st.markdown(f"#### {pos} &nbsp;<span style='background:{color};color:white;"
+                f"padding:1px 11px;border-radius:6px'>{g}</span>", unsafe_allow_html=True)
+    a, b = st.columns(2)
+    a.metric("NFL rank", f"#{rk} of {n}")
+    b.metric("Anchor", top)
+    if db.table_exists("free_agents"):
+        pool = _free_agents()
+        if "talent" in pool.columns:
+            cands = pool[pool["pos_group"] == pos].nlargest(3, "talent")
+            if not cands.empty:
+                st.caption(f"Best available to upgrade {pos}:")
+                show = cands[["player", "age", "madden_ovr", "est_apy"]].copy()
+                for col in ("madden_ovr", "age"):
+                    show[col] = show[col].round(0).astype("Int64")
+                st.dataframe(show, hide_index=True, column_config={
+                    "madden_ovr": st.column_config.NumberColumn("OVR"),
+                    "est_apy": st.column_config.NumberColumn("$/yr", format="$%.1fM"),
+                })
+
+
+# --------------------------------------------------------------------------- #
 # Super Bowl Maxer
 # --------------------------------------------------------------------------- #
 def maxer_tab() -> None:
@@ -310,15 +434,23 @@ def maxer_tab() -> None:
         "(coaching/GM/ownership proxy via recent franchise success).")
 
     needs = rep["needs"]
+    st.markdown("##### 🏟️ Your roster, on the field")
+    st.caption("Your **offense** (left) lined up against a base **defense** (right). "
+               "Every box is a player spot, shaded by its unit's grade "
+               "(green strong → red weak). Hover for detail; **click a spot** to fix it.")
+    fig, order = _field_figure(team, strength)
+    sel = st.plotly_chart(fig, use_container_width=True, on_select="rerun",
+                          key=f"field_{team}")
+    picked = _picked_position(sel, order) or (rep["top_needs"][0] if rep["top_needs"] else None)
+
     left, right = st.columns([3, 2])
     with left:
-        st.caption("**Strength** = this unit's percentile vs. the league (50 = avg, "
-                   "100 = best); **blueprint** = the contender target. A bar below "
-                   "its target is a gap.")
-        chart = needs.set_index("pos_group")[["strength", "blueprint"]]
-        st.bar_chart(chart, stack=False, height=360)
+        if picked:
+            _position_detail(picked, team, strength)
+        else:
+            st.caption("Click a position on the field to drill in.")
     with right:
-        st.caption("Report card — grade + NFL rank per position (weakest first).")
+        st.caption("Report card — weakest first.")
         ranked = strength.assign(
             rk=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
         n_teams = strength["team"].nunique()
