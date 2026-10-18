@@ -80,6 +80,18 @@ def _free_agents() -> pd.DataFrame:
     return db.read_table("free_agents")
 
 
+@st.cache_data(show_spinner=False)
+def _player_talent() -> pd.DataFrame:
+    return db.read_table("player_talent")
+
+
+@st.cache_data(show_spinner=False)
+def _prior_rank(season: int) -> dict:
+    """team -> where it finished `season` (regular-season record rank)."""
+    df = sb_maxer.prior_season_rank(season)
+    return dict(zip(df["team"], df["prev_rank"])) if not df.empty else {}
+
+
 # --------------------------------------------------------------------------- #
 # Boardroom
 # --------------------------------------------------------------------------- #
@@ -130,6 +142,22 @@ def boardroom_tab() -> None:
             "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
             "n_players": st.column_config.NumberColumn("players"),
         })
+
+    # On-field efficiency from the PBP lakehouse (nflfastR EPA, built by the Spark
+    # medallion and published to the app db). Did the cap allocation translate?
+    if db.table_exists("pbp_team_season_epa"):
+        epa = db.query("SELECT * FROM pbp_team_season_epa WHERE season = :s", s=season)
+        if not epa.empty and (epa["team"] == team).any():
+            r = epa.set_index("team").loc[team]
+            rank = int((epa["net_epa_play"] > r["net_epa_play"]).sum()) + 1
+            st.caption("On-field efficiency from the **PBP lakehouse** "
+                       "(nflfastR EPA via the Spark medallion) — did the cap "
+                       "allocation translate to results?")
+            e1, e2, e3 = st.columns(3)
+            e1.metric("Off. EPA/play", f"{r['off_epa_play']:+.3f}")
+            e2.metric("Def. EPA/play allowed", f"{r['def_epa_play_allowed']:+.3f}")
+            e3.metric("Net EPA/play", f"{r['net_epa_play']:+.3f}")
+            st.caption(f"Net EPA/play ranks **#{rank} of {len(epa)}** teams in {season}.")
 
     st.divider()
     st.subheader("Winning roster archetypes (k-means on spending profiles)")
@@ -263,31 +291,73 @@ def _style_grades(df: pd.DataFrame, cols: list[str]):
 # --------------------------------------------------------------------------- #
 #: The base personnel most NFL teams actually run — **11-personnel shotgun**
 #: offense (1 RB, 1 TE, 3 WR) against a **nickel** defense (4 down, 2 LB, 5 DB),
-#: drawn vertically (offense at the bottom, driving up). Each spot is a labeled
-#: box colored by its position **group** grade; several boxes can share a group.
-#: Coordinates are ``(label, group, x, y)`` with x = field width (0–53.3) and
-#: y = field length (offense LOS ≈ 44).
-_FORMATION: list[tuple[str, str, float, float]] = [
-    # OFFENSE — shotgun 11 personnel, driving up
-    ("WR", "WR", 3, 42.5), ("WR", "WR", 50, 42.5), ("WR", "WR", 10, 41),
-    ("LT", "OL", 16, 44), ("LG", "OL", 21, 44), ("C", "OL", 26.5, 44),
-    ("RG", "OL", 32, 44), ("RT", "OL", 37, 44),
-    ("TE", "TE", 42, 44),
-    ("QB", "QB", 25, 38), ("RB", "RB", 31, 38),
-    # DEFENSE — nickel (4-2-5)
-    ("DE", "EDGE", 15, 47), ("DT", "IDL", 22, 47), ("DT", "IDL", 31, 47),
-    ("DE", "EDGE", 38, 47),
-    ("LB", "LB", 21, 51), ("LB", "LB", 32, 51),
-    ("CB", "CB", 3, 47), ("CB", "CB", 50, 47), ("NB", "CB", 11, 50),
-    ("FS", "S", 18, 58), ("SS", "S", 35, 58),
+#: drawn vertically (offense at the bottom, driving up). Each slot is filled with
+#: the team's likely starter there (see :func:`_assign_starters`) and shaded by
+#: its position **group** grade. Tuple = ``(role, group, x, y, dcp_bucket)`` with
+#: x = field width (0–53.3), y = field length (offense LOS ≈ 44); ``dcp_bucket``
+#: pins a slot to a granular ``depth_chart_position`` (a 'T' at tackle, an 'FS' at
+#: free safety) so the right player lands there — ``None`` fills by talent order.
+_FORMATION: list[tuple[str, str, float, float, str | None]] = [
+    # OFFENSE — 11 personnel shotgun (X/Z split wide, slot inside), driving up
+    ("X", "WR", 3, 42.5, None), ("Z", "WR", 50, 42.5, None), ("SLOT", "WR", 10, 41, None),
+    ("LT", "OL", 16, 44, "T"), ("LG", "OL", 21, 44, "G"), ("C", "OL", 26.5, 44, "C"),
+    ("RG", "OL", 32, 44, "G"), ("RT", "OL", 37, 44, "T"),
+    ("TE", "TE", 42, 44, None),
+    ("QB", "QB", 25, 38, None), ("RB", "RB", 31, 38, None),
+    # DEFENSE — nickel (4-2-5): NB (nickel back) is the 3rd CB, over the slot
+    ("DE", "EDGE", 15, 47, None), ("DT", "IDL", 22, 47, None), ("DT", "IDL", 31, 47, None),
+    ("DE", "EDGE", 38, 47, None),
+    ("LB", "LB", 21, 51, None), ("LB", "LB", 32, 51, None),
+    ("CB", "CB", 3, 47, None), ("CB", "CB", 50, 47, None), ("NB", "CB", 11, 50, None),
+    ("FS", "S", 18, 58, "FS"), ("SS", "S", 35, 58, "SS"),
 ]
 
 
-def _field_figure(team: str, strength: pd.DataFrame, highlight: str | None = None):
-    """Plotly formation view (vertical): the base personnel most teams run —
-    11-personnel offense (bottom) vs. a nickel defense (top) — as labeled player
-    boxes shaded by their position **group** grade (green strong → red weak).
-    Boxes belonging to the ``highlight`` group get a bright gold ring.
+def _assign_starters(team: str, players: pd.DataFrame | None) -> list[dict | None]:
+    """Fill each formation slot with this team's likely starter there.
+
+    Starters are ranked by **Madden overall** — who actually plays — not the
+    age/trend-adjusted ``talent`` (which would bench an aging star behind a
+    younger backup). Granular ``depth_chart_position`` pins players to the right
+    slot (a 'T' at tackle, 'FS'/'SS' at safety); anything without a bucket fills by
+    grade, so the nickel back is the 3rd corner and the slot is the 3rd receiver.
+    The formation is walked in order, consuming players so nobody starts twice.
+    """
+    if players is None or players.empty:
+        return [None] * len(_FORMATION)
+    tp = players[players["team"] == team]
+    used: set = set()
+    out: list[dict | None] = []
+    for _role, grp, _x, _y, bucket in _FORMATION:
+        pool = tp[tp["pos_group"] == grp].sort_values(
+            ["madden_ovr", "talent"], ascending=False, na_position="last")
+        buckets = ([pool[pool["depth_chart_position"] == bucket]] if bucket else []) + [pool]
+        pick = None
+        for cand in buckets:                       # granular slot first, then the group
+            for _, row in cand.iterrows():
+                if row["gsis_id"] not in used:
+                    pick = row
+                    break
+            if pick is not None:
+                break
+        if pick is None:
+            out.append(None)
+            continue
+        used.add(pick["gsis_id"])
+        out.append({"player": pick["player"], "ovr": pick.get("madden_ovr"),
+                    "age": pick.get("age"), "dcp": pick.get("depth_chart_position"),
+                    "injured": bool(pick.get("injured_last"))})
+    return out
+
+
+def _field_figure(team: str, strength: pd.DataFrame,
+                  players: pd.DataFrame | None = None, highlight: str | None = None):
+    """Plotly formation view (vertical): the team's likely **starters** on the
+    base most teams run — 11-personnel offense (bottom) vs. a nickel defense
+    (top). Each box is the real player at that slot (from ``players`` via
+    :func:`_assign_starters`), shaded by its position **group** grade (green
+    strong → red weak); hover shows the player. Boxes in the ``highlight`` group
+    get a bright gold ring.
     """
     import plotly.graph_objects as go
     rs = strength[strength["team"] == team].set_index("pos_group")
@@ -295,6 +365,7 @@ def _field_figure(team: str, strength: pd.DataFrame, highlight: str | None = Non
         rk=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
     tr = ranked[ranked["team"] == team].set_index("pos_group")["rk"]
     n = int(strength["team"].nunique())
+    starters = _assign_starters(team, players)
 
     fig = go.Figure()
     fig.add_shape(type="rect", x0=0, x1=53.3, y0=-10, y1=110, layer="below",
@@ -311,13 +382,22 @@ def _field_figure(team: str, strength: pd.DataFrame, highlight: str | None = Non
 
     xs, ys, texts, colors, hovers = [], [], [], [], []
     lcolors, lwidths, sizes = [], [], []
-    for label, grp, x, y in _FORMATION:
+    for i, (label, grp, x, y, _bucket) in enumerate(_FORMATION):
+        who = starters[i]
         if grp in rs.index:
             s = float(rs.at[grp, "strength"]); g = _grade(s); rk = int(tr.get(grp, n))
-            top = rs.at[grp, "top_player"] if "top_player" in rs.columns else ""
             colors.append(_GRADE_BG[g])
-            hovers.append(f"<b>{label}</b> · {grp} unit · grade {g}<br>"
-                          f"#{rk} of {n} in the NFL · strength {s:.0f}/100<br>top: {top}")
+            if who:
+                ovr = f"Madden {who['ovr']:.0f}" if pd.notna(who["ovr"]) else "unrated"
+                age = f"{who['age']:.0f}" if pd.notna(who["age"]) else "—"
+                dcp = who["dcp"] or grp
+                inj = " · 🩹 credited back from injury" if who.get("injured") else ""
+                hovers.append(f"<b>{who['player']}</b> · {label} ({dcp}){inj}<br>"
+                              f"{ovr} · age {age}<br>"
+                              f"{grp} unit: grade {g} · #{rk} of {n} in the NFL")
+            else:
+                hovers.append(f"<b>{label}</b> · {grp} unit · grade {g}<br>"
+                              f"#{rk} of {n} · no starter listed")
         else:
             colors.append("#8a8a8a")
             hovers.append(f"{label} · {grp} · no data")
@@ -417,27 +497,45 @@ def maxer_tab() -> None:
                         index=teams.index("KC") if "KC" in teams else 0)
     rep = sb_maxer.team_report(team, strength)
 
+    prev_season = int(meta["roster_season"]) - 1
+    prev = _prior_rank(prev_season).get(team)
+    cur = rep["rank"]
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("SB outlook", f"{rep['readiness']:.1f}/100")
     c2.metric("Roster", f"{rep['roster_readiness']:.0f}")
     c3.metric("Organization", f"{rep['org_score']:.0f}")
-    c4.metric("League rank", f"#{rep['rank']} of {rep['n_teams']}")
+    if prev:
+        move = prev - cur                                # +ve = climbed the board
+        delta = f"{move:+d} vs {prev_season} finish (#{prev})" if move \
+            else f"same as {prev_season} finish (#{prev})"
+        c4.metric(f"Predicted rank ({meta['roster_season']})",
+                  f"#{cur} of {rep['n_teams']}",
+                  delta=delta, delta_color=("normal" if move else "off"),
+                  help=f"Where the Maxer projects {team} this year vs. where they "
+                       f"finished the {prev_season} regular season (#{prev}).")
+    else:
+        c4.metric(f"Predicted rank ({meta['roster_season']})",
+                  f"#{cur} of {rep['n_teams']}")
     st.caption(
         f"Biggest needs: **{', '.join(rep['top_needs']) or '—'}**  ·  "
         "Outlook = 55% roster talent + 45% organization "
-        "(coaching/GM/ownership proxy via recent franchise success).")
+        "(coaching/GM/ownership proxy via recent franchise success)  ·  "
+        f"rank arrow = projection vs the {prev_season} final standings.")
 
     needs = rep["needs"]
     st.markdown("##### 🏟️ Your roster, on the field")
-    st.caption("The base most teams actually run — **11-personnel** offense (bottom) "
-               "vs. a **nickel** defense (top). Each box is a player spot, shaded by "
-               "its unit's grade (green strong → red weak); hover any box for detail.")
+    st.caption("Your projected **starters** on the base most teams run — "
+               "**11-personnel** offense (bottom) vs. a **nickel** defense (top). "
+               "Boxes shade by unit grade (green strong → red weak); the **nickel "
+               "back** is your 3rd corner and the **slot** your 3rd receiver. "
+               "**Hover any box for the player.**")
     units = list(needs["pos_group"])            # weakest first
     picked = st.selectbox("🔍 Break down a unit (weakest first)", units,
                           key=f"mx_pick_{team}")
+    roster = _player_talent() if db.table_exists("player_talent") else None
     fc = st.columns([1, 2, 1])
     with fc[1]:
-        st.plotly_chart(_field_figure(team, strength, highlight=picked),
+        st.plotly_chart(_field_figure(team, strength, players=roster, highlight=picked),
                         use_container_width=True, key=f"field_{team}")
 
     left, right = st.columns([3, 2])
