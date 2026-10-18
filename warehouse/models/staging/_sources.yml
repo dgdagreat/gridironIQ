@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Tables landed by warehouse/load_raw.py from the Boardroom SQLite DB and
+      raw parquet. This is the ingestion -> warehouse boundary; the Python
+      `gridiron` package owns everything upstream, dbt owns everything below.
+    schema: raw
+    tables:
+      - name: positional_spending
+        description: Team x season x position-group cap spending (long/tidy).
+      - name: spending_features
+        description: Model-ready wide matrix, one row per team-season.
+      - name: team_outcomes
+        description: Supervised target — SB appearance/win per team-season.
+      - name: league_cap
+        description: Per-team league salary cap by season (the share denominator).
+      - name: super_bowls
+        description: Super Bowl winner/loser reference by season.
+      - name: player_year_caps
+        description: Exploded player x season cap charges (governing contract only).
+      - name: roster_strength
+        description: Per-team per-unit roster grades (Super Bowl Maxer).
+      - name: value_board
+        description: Most cap-efficient players (caliber_pct - pay_pct by position).

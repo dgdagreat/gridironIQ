@@ -1,0 +1,29 @@
+name: 'gridiron'
+version: '1.0.0'
+config-version: 2
+
+# The profile lives in warehouse/profiles.yml (run dbt with --profiles-dir .).
+# dev  -> DuckDB (local, free, columnar) at ../data/warehouse.duckdb
+# prod -> Databricks (uncomment the block in profiles.yml once your workspace exists)
+profile: 'gridiron'
+
+# Disable dbt's anonymous usage telemetry — it's a privacy win and avoids a
+# startup hang when the analytics endpoint is slow/blocked (e.g. sandboxed CI).
+flags:
+  send_anonymous_usage_stats: false
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# The Python `gridiron` package lands raw tables into schema `raw`
+# (see load_raw.py); dbt owns everything downstream.
+models:
+  gridiron:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

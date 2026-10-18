@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: dim_season
+    description: Season dimension — league cap, era, milestone, finalized flag.
+    columns:
+      - name: season
+        data_tests: [unique, not_null]
+
+  - name: fct_team_season
+    description: One row per team-season — positional cap-share features + SB target.
+    columns:
+      - name: team_season_sk
+        data_tests: [unique, not_null]
+      - name: season
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_season')
+                field: season
+      - name: sb_win
+        data_tests:
+          - accepted_values: { arguments: { values: [0, 1] } }
+
+  - name: int_positional_long
+    description: Long positional spending tagged with SB outcomes.
+    columns:
+      - name: spend_sk
+        data_tests: [unique, not_null]
+      - name: pos_group
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [QB, RB, WR, TE, OL, IDL, EDGE, LB, CB, S, SPEC, UNK]
+
+  - name: mart_position_success
+    description: >
+      Champion premium by position — the platform's headline analytical output.
+      Positive premium = winners spend above league average at that position.
+    columns:
+      - name: pos_group
+        data_tests: [unique, not_null]
+      - name: champion_premium
+        data_tests: [not_null]
+
+  - name: mart_positional_era_avg
+    description: Average positional cap share by era (era-aware baselines).
+    columns:
+      - name: n_team_seasons
+        data_tests: [not_null]
