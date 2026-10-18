@@ -84,7 +84,9 @@ gridironIQ/
 ├── app/streamlit_app.py       # working frontend (Boardroom + Film Room + Maxer tabs)
 ├── frontend/                  # planned React build (see frontend/README.md)
 ├── data/                      # raw + processed artifacts, SQLite db (git-ignored)
-└── notebooks/
+└── notebooks/                 # exploratory analysis (imports from gridiron/)
+    ├── 01_cap_eda.ipynb       # data-quality discovery: the >400% double-count, sparse pre-2011
+    └── 02_model_results.ipynb # findings: champion premium, archetypes, ROC, feature importance
 ```
 
 ---
@@ -118,13 +120,14 @@ streamlit run app/streamlit_app.py
 cp .env.example .env   # then set ANTHROPIC_API_KEY
 ```
 
-The Maxer roster layer is refreshed **daily** by a `launchd` agent
-(`~/Library/LaunchAgents/com.gridironiq.refresh.plist`) so it tracks NFL churn.
-Inspect/remove it with:
+The data layer is refreshed **daily** by a GitHub Actions schedule
+([`.github/workflows/daily-refresh.yml`](.github/workflows/daily-refresh.yml)): it
+runs the cap ETL + roster refresh against the live sources, uploads the refreshed
+SQLite db as a build artifact, and acts as a canary if a source format changes.
+Trigger it by hand from the **Actions** tab ("Run workflow"), or refresh locally:
 
 ```bash
-launchctl print  gui/$(id -u)/com.gridironiq.refresh     # status
-launchctl bootout gui/$(id -u)/com.gridironiq.refresh    # disable
+python scripts/run_cap_etl.py && python scripts/refresh_rosters.py --force
 ```
 
 ---
@@ -251,8 +254,8 @@ cheap-but-solid target (Keenan Allen ~$3M) stands out next to a pricey name (Dee
 cuts, and signings appear), grades from the maintained
 [nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data) repo. Every
 download is cached with a TTL and re-fetchable (`--force`); each output is stamped
-`data_as_of`. A `launchd` agent runs `scripts/refresh_rosters.py` **daily** (and
-catches up on wake), so nothing is ever hardcoded or stale.
+`data_as_of`. A GitHub Actions schedule runs the refresh **daily** against the live
+sources, so nothing is ever hardcoded or stale.
 
 **Outlook = roster + organization.** A pure talent grade under-rates young,
 well-coached teams (NE/SEA graded out low despite reaching the Super Bowl), so the
@@ -286,7 +289,7 @@ so it never offers a player who's already signed.
 | **Super Bowl Maxer** — SB outlook (roster + organization) | ✅ live (2026 rosters, 32 teams; age/trend-adjusted) |
 | Maxer: free-agent needs recommender | ✅ live (re-derives FA pool each refresh) |
 | Maxer: ESPN cross-check + roster auto-fill | ✅ live (89 ESPN-only players filled) |
-| Maxer daily refresh (launchd) | ✅ installed & scheduled |
+| Data refresh (daily, GitHub Actions) | ✅ scheduled + manual dispatch |
 | Streamlit app (3 tabs) | ✅ Boardroom + Maxer live; Film Room wired |
 | Charting metrics (separation, YACO) | 🟡 scaffolded (NGS/PFR pass) |
 | React frontend | 📋 planned ([frontend/README.md](frontend/README.md)) |
@@ -296,5 +299,5 @@ so it never offers a player who's already signed.
 ## Tech stack
 
 Python · pandas · scikit-learn · matplotlib/seaborn · SQLite (SQLAlchemy) ·
-Streamlit · Anthropic API (`claude-sonnet-4-6`) · launchd (daily refresh) ·
+Streamlit · Anthropic API (`claude-sonnet-4-6`) · GitHub Actions (daily refresh) ·
 data: nflverse/OverTheCap · nflfastR · [nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data).

@@ -1,0 +1,50 @@
+name: Daily data refresh
+
+# Replaces the local launchd job (com.gridironiq.refresh) that ran
+# scripts/refresh_rosters.py every morning. Runs the full live-data pipeline on a
+# schedule, doubles as a canary that the nflverse / ESPN / Madden sources still
+# parse, and publishes the refreshed SQLite database as a downloadable artifact.
+
+on:
+  schedule:
+    - cron: "0 13 * * *"        # 13:00 UTC ~= 06:00 America/Los_Angeles
+  workflow_dispatch: {}          # manual "Run workflow" button
+
+concurrency:
+  group: daily-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: cap ETL + roster refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e .
+
+      # 1) Boardroom: OverTheCap contracts -> positional spending -> SQLite + views.
+      - name: Cap ETL
+        run: python scripts/run_cap_etl.py
+
+      # 2) Maxer: live nflverse roster + ESPN autofill + Madden grades ->
+      #    talent / roster strength / league table / free agents / value board.
+      - name: Roster refresh
+        run: python scripts/refresh_rosters.py --force
+
+      - name: Upload refreshed data
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridiron-data-${{ github.run_id }}
+          path: |
+            data/gridiron.db
+            data/processed/
+          retention-days: 14
+          if-no-files-found: error
