@@ -1,0 +1,62 @@
+# Databricks Asset Bundle — schedules the PBP medallion as a Databricks Job.
+#
+# Deploy (needs the Databricks CLI + a configured profile):
+#   cd lakehouse
+#   databricks bundle validate
+#   databricks bundle deploy  -t prod        # creates/updates the scheduled job
+#   databricks bundle run pbp_medallion -t prod   # run it once now
+#
+# Prereqs in the workspace: a Unity Catalog volume for the lakehouse output, and
+# (first run) the catalog/schema. The dataset is ~0.5 GB, so a SINGLE-NODE job
+# cluster is plenty — raw PBP lands on the driver via gridiron, Spark reads it
+# there, and the Gold Delta tables persist to the volume. Databricks Runtime
+# already ships pyspark + Delta + pandas/pyarrow, so no extra libraries are needed.
+
+bundle:
+  name: gridiron-pbp-medallion
+
+variables:
+  lake_root:
+    description: Unity Catalog volume path for the Delta lakehouse (bronze/silver/gold)
+    default: /Volumes/gridiron/pbp/lakehouse
+  node_type_id:
+    description: Cloud-specific VM size (AWS i3.xlarge | Azure Standard_DS3_v2 | GCP n1-standard-4)
+    default: i3.xlarge
+
+resources:
+  jobs:
+    pbp_medallion:
+      name: gridiron-pbp-medallion
+      # Daily, replacing the old laptop refresh. Overwrite semantics make it idempotent.
+      schedule:
+        quartz_cron_expression: "0 0 14 * * ?"   # 14:00 UTC daily
+        timezone_id: UTC
+        pause_status: UNPAUSED
+      email_notifications:
+        on_failure: []   # add your address to be paged if a source format breaks
+      tasks:
+        - task_key: medallion
+          spark_python_task:
+            python_file: ./run_medallion.py
+            parameters: ["--start", "1999", "--end", "2025"]
+          job_cluster_key: medallion
+      job_clusters:
+        - job_cluster_key: medallion
+          new_cluster:
+            spark_version: 15.4.x-scala2.12       # an LTS Databricks Runtime
+            node_type_id: ${var.node_type_id}
+            num_workers: 0                          # single-node: data is ~0.5 GB
+            spark_conf:
+              spark.master: "local[*]"
+              spark.databricks.cluster.profile: singleNode
+            custom_tags:
+              ResourceClass: SingleNode
+            spark_env_vars:
+              GRIDIRON_LAKE: ${var.lake_root}
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
