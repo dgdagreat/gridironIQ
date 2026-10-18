@@ -78,18 +78,27 @@ print("bronze_pbp rows:", bronze.count())
 
 # COMMAND ----------
 # SILVER — curated, typed, de-duped real plays with an EPA + explosive flag.
+# Bronze lands everything as string; here we re-type. Flags like `pass` arrive
+# as "1.0", so we cast via DOUBLE (string->int of "1.0" is rejected under the
+# serverless ANSI-cast default). Writing them as doubles also lets Gold cast
+# straight to int (double->int is ANSI-legal).
 KEEP = ["season", "week", "game_id", "play_id", "posteam", "defteam", "play_type",
         "down", "ydstogo", "yardline_100", "yards_gained", "epa", "wpa", "success",
         "pass", "rush", "qb_dropback", "qb_hit", "sack", "complete_pass",
         "touchdown", "interception", "fumble_lost", "air_yards", "yards_after_catch"]
+NUMERIC = ["down", "ydstogo", "yardline_100", "yards_gained", "epa", "wpa",
+           "success", "pass", "rush", "qb_dropback", "qb_hit", "sack",
+           "complete_pass", "touchdown", "interception", "fumble_lost",
+           "air_yards", "yards_after_catch"]
 
 b = spark.read.table(f"{CATALOG}.{SCHEMA}.bronze_pbp")
-s = b.select(*[c for c in KEEP if c in b.columns]).filter(
-    F.col("epa").isNotNull() & F.col("posteam").isNotNull() & F.col("defteam").isNotNull())
-for c in ("epa", "wpa", "yards_gained", "air_yards", "yards_after_catch"):
+s = b.select(*[c for c in KEEP if c in b.columns])
+for c in NUMERIC:
     if c in s.columns:
         s = s.withColumn(c, F.col(c).cast("double"))
-_is_pass = F.coalesce(F.col("pass").cast("int"), F.lit(0)) == 1
+s = s.filter(F.col("epa").isNotNull() & F.col("posteam").isNotNull()
+             & F.col("defteam").isNotNull())
+_is_pass = F.coalesce(F.col("pass"), F.lit(0.0)) == 1
 s = s.withColumn("explosive",
                  F.when(_is_pass & (F.col("yards_gained") >= 20), 1)
                   .when(~_is_pass & (F.col("yards_gained") >= 10), 1).otherwise(0))
