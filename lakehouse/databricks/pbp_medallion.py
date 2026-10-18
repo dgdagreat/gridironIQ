@@ -47,10 +47,30 @@ for s in SEASONS:
         print(f"[warn] {s}: {e}")
 
 # COMMAND ----------
-# BRONZE — land raw plays as-is (every column), partitioned by season.
+# BRONZE — land raw plays, EVERY column cast to string so 11 seasons union
+# losslessly. Raw nflfastR drifts a column's *type* year to year (double one
+# season, something else the next), which breaks parquet mergeSchema. Reading
+# each season as text and unioning by name sidesteps that; Silver/Gold re-type
+# the handful of columns they use (epa, yards, pass/rush/qb_hit/sack, success).
+import os
+from functools import reduce
 from pyspark.sql import functions as F
 
-bronze = (spark.read.option("mergeSchema", "true").parquet(f"{VOLUME}/pbp_*.parquet")
+paths = [f"{VOLUME}/pbp_{s}.parquet" for s in SEASONS
+         if os.path.exists(f"{VOLUME}/pbp_{s}.parquet")]
+print(f"{len(paths)} season files")
+
+
+def _read_as_text(path):
+    df = spark.read.parquet(path)
+    return df.select([F.col(c).cast("string").alias(c) for c in df.columns])
+
+
+bronze = reduce(lambda a, b: a.unionByName(b, allowMissingColumns=True),
+                [_read_as_text(p) for p in paths])
+bronze = (bronze
+          .withColumn("season", F.col("season").cast("int"))
+          .withColumn("week", F.col("week").cast("int"))
           .withColumn("_ingested_at", F.current_timestamp()))
 (bronze.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
  .partitionBy("season").saveAsTable(f"{CATALOG}.{SCHEMA}.bronze_pbp"))
