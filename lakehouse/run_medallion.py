@@ -42,6 +42,22 @@ def ensure_raw(seasons, force: bool = False) -> None:
             print(f"[warn] could not land raw PBP for {s}: {exc}")
 
 
+def publish_to_app(team_game, team_season) -> None:
+    """Serve the Gold team-EPA features to the Streamlit app's SQLite db.
+
+    On Databricks the app/BI reads the Gold Delta directly; locally the app reads
+    plain pandas, so we land the (small) Gold tables into gridiron.db for it.
+    """
+    try:
+        from gridiron import db
+    except Exception as exc:  # noqa: BLE001
+        print(f"[warn] --publish skipped (gridiron db unavailable): {exc}")
+        return
+    db.write_table(team_season.toPandas(), "pbp_team_season_epa")
+    db.write_table(team_game.toPandas(), "pbp_team_game_epa")
+    print("published pbp_team_season_epa + pbp_team_game_epa to the app db")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Build the nflfastR PBP medallion (Bronze/Silver/Gold).")
@@ -52,6 +68,8 @@ def main() -> int:
     ap.add_argument("--skip-ingest", action="store_true",
                     help="assume raw PBP parquet is already present")
     ap.add_argument("--force", action="store_true", help="re-download raw PBP")
+    ap.add_argument("--publish", action="store_true",
+                    help="also serve Gold team-EPA to the app's SQLite db")
     args = ap.parse_args()
 
     seasons = range(args.start, args.end + 1)
@@ -73,6 +91,8 @@ def main() -> int:
         tg, ts = gold.build_gold(spark)
         print(f"gold/team_game:    {tg.count():>9,} rows")
         print(f"gold/team_season:  {ts.count():>9,} rows")
+        if args.publish:
+            publish_to_app(tg, ts)
     print(f"done in {time.time() - t0:.1f}s  ->  {paths.LAKE_ROOT}")
     return 0
 
