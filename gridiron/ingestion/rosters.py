@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 ROSTER_URL = config.NFLVERSE_RELEASE_BASE + "/rosters/roster_{season}.parquet"
 MADDEN_URL = ("https://raw.githubusercontent.com/theedgepredictor/"
               "nfl-madden-data/main/data/madden/dataset/{season}.parquet")
+SNAP_URL = config.NFLVERSE_RELEASE_BASE + "/snap_counts/snap_counts_{season}.parquet"
 DEFAULT_TTL_HOURS = 24
 
 
@@ -125,6 +126,37 @@ def load_av_history(base_season: int, *, force: bool = False) -> pd.DataFrame:
     return out
 
 
+def load_snap_counts(season: int, *, ttl_hours: float = DEFAULT_TTL_HOURS,
+                     force: bool = False) -> pd.DataFrame:
+    """nflverse per-game snap counts for ``season`` (all positions)."""
+    path = _cached_download(SNAP_URL.format(season=season),
+                            config.RAW_DIR / f"snap_counts_{season}.parquet",
+                            ttl_hours, force)
+    return pd.read_parquet(path)
+
+
+def games_played(season: int, id_crosswalk: pd.DataFrame, *,
+                 force: bool = False) -> pd.Series:
+    """Regular-season games each player actually played in ``season`` (by gsis_id).
+
+    A game with any snap (offense / defense / special teams) counts as played, so
+    an injury-shortened year reads as a low total (a full season is 17). Snap
+    counts are keyed by PFR id, so ``id_crosswalk`` (columns pfr_id, gsis_id) maps
+    them to gsis_id. Returns an empty series if that season isn't posted yet.
+    """
+    try:
+        snaps = load_snap_counts(season, force=force)
+    except requests.RequestException:  # pragma: no cover - season not posted yet
+        return pd.Series(dtype="float64", name="games_av0")
+    reg = snaps[snaps.get("game_type", pd.Series("REG", index=snaps.index)).eq("REG")]
+    played = reg[["offense_snaps", "defense_snaps", "st_snaps"]].fillna(0).sum(axis=1) > 0
+    gp = (reg[played].groupby("pfr_player_id")["game_id"].nunique()
+          .rename("games").reset_index())
+    xwalk = id_crosswalk.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
+    gp = gp.merge(xwalk, left_on="pfr_player_id", right_on="pfr_id", how="inner")
+    return gp.set_index("gsis_id")["games"].rename("games_av0")
+
+
 # --------------------------------------------------------------------------- #
 # Join: who is on the roster now × how good they are
 # --------------------------------------------------------------------------- #
@@ -183,15 +215,31 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
                             on="gsis_id", how="left")
     players["last_av"] = players["av0"]
 
+    # Availability: regular-season games played in the season av0 reflects. The
+    # Madden file's AV lags one year (av0 ≈ madden_season - 1), so a low total
+    # there means the player missed time that year — the talent model uses it to
+    # avoid punishing a returning player for an injury-shortened season (see
+    # roster_strength.player_talent_scores).
+    av0_season = madden_season - 1
+    xwalk = roster[[c for c in ("pfr_id", "gsis_id") if c in roster.columns]]
+    if {"pfr_id", "gsis_id"}.issubset(xwalk.columns):
+        players["games_av0"] = players["gsis_id"].map(
+            games_played(av0_season, xwalk, force=force))
+    else:
+        players["games_av0"] = pd.NA
+
     players = players[players["pos_group"].ne("UNK") & players["team"].notna()]
 
     meta = {
         "roster_season": roster_season,
         "madden_season": madden_season,
+        "av0_season": av0_season,
         "data_as_of": dt.datetime.now().isoformat(timespec="seconds"),
         "n_players": len(players),
         "n_graded": int(players["madden_ovr"].notna().sum()),
         "n_espn_added": int((players["source"] == "espn").sum()),
+        "n_injury_flag": int(
+            (pd.to_numeric(players["games_av0"], errors="coerce") < 8).sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta

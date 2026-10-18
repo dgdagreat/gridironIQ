@@ -72,19 +72,41 @@ def trend_factor(av0: float | None, av1: float | None, av2: float | None) -> flo
     return min(TREND_MAX, max(TREND_MIN, 1.0 + TREND_SENSITIVITY * (ratio - 1)))
 
 
+#: Below this many games in the season its AV reflects, a player's production is
+#: treated as injury-shortened (a full season is 17) — see player_talent_scores.
+INJURY_GP_MAX = 8
+
+
 def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
     """Add a 0–1 ``talent`` score per player (mean of available signals).
 
     Each signal (Madden overall = external grade, AV = production) is
     percentile-ranked *within its position group*, then averaged per player;
     unrated players fall back to :data:`UNRATED_TALENT`.
+
+    **Coming off injury:** if the season a player's AV reflects was
+    injury-shortened (``games_av0`` below :data:`INJURY_GP_MAX`), that AV
+    understates him — so he is scored on his best recent *healthy* season instead,
+    and the production-trend penalty is waived (a missed year isn't a decline).
+    Needs the games feed from ``ingestion.rosters.build_player_talent``; without
+    ``games_av0`` nobody is flagged and scoring is unchanged.
     """
     df = players.copy()
-    for col in ("madden_ovr", "last_av", "age", "av0", "av1", "av2"):
+    for col in ("madden_ovr", "last_av", "age", "av0", "av1", "av2", "games_av0"):
         if col not in df:
             df[col] = pd.NA
-    for col in ("madden_ovr", "last_av"):
-        df[f"{col}_pct"] = df.groupby("pos_group")[col].rank(pct=True)
+
+    # Injury guard: a low games total in the AV's own season means missed time.
+    gp = pd.to_numeric(df["games_av0"], errors="coerce")
+    injured = gp.notna() & (gp < INJURY_GP_MAX)
+    healthy_av = df[["av0", "av1", "av2"]].apply(
+        pd.to_numeric, errors="coerce").max(axis=1)
+    # Score injured players on their best recent (healthy) production, not the dip.
+    df["last_av_eff"] = df["last_av"].where(~injured, healthy_av)
+    df["injured_last"] = injured
+
+    df["madden_ovr_pct"] = df.groupby("pos_group")["madden_ovr"].rank(pct=True)
+    df["last_av_pct"] = df.groupby("pos_group")["last_av_eff"].rank(pct=True)
 
     # Static talent = blend of external grade + production (percentile within pos).
     df["talent_static"] = (
@@ -97,6 +119,8 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
         trend_factor(a0, a1, a2)
         for a0, a1, a2 in zip(df["av0"], df["av1"], df["av2"])
     ]
+    # A missed season is not a decline — waive the trend penalty for injured players.
+    df.loc[injured, "trend_factor"] = df.loc[injured, "trend_factor"].clip(lower=1.0)
     df["talent"] = (df["talent_static"] * df["age_factor"] * df["trend_factor"]).clip(0, 1)
     return df
 
