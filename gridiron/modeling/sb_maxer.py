@@ -50,6 +50,50 @@ def champion_blueprint(weights: pd.Series | None = None) -> pd.Series:
     return (BLUEPRINT_BASE + BLUEPRINT_SPAN * weights).rename("blueprint")
 
 
+def prior_season_rank(season: int) -> pd.DataFrame:
+    """Where teams *finished* a completed regular season — the "going into this
+    year" baseline the predicted outlook rank moves from.
+
+    Ranks the teams by that season's regular-season record (win%, then point
+    differential as tiebreak); rank 1 = best. Returns team, wins, losses,
+    win_pct, point_diff, prev_rank — empty if ``season`` has no completed games.
+    """
+    from gridiron.ingestion import schedules
+    from gridiron.ingestion.reference import CANONICAL_TEAMS, canonical_team
+
+    sched = schedules.load_schedules()
+    if "home_score" not in sched:
+        return pd.DataFrame(columns=["team", "wins", "losses", "win_pct",
+                                     "point_diff", "prev_rank"])
+    gtype = sched["game_type"] if "game_type" in sched else "REG"
+    g = sched[(sched["season"] == season) & sched["home_score"].notna()
+              & (gtype == "REG")].copy()
+    if g.empty:
+        return pd.DataFrame(columns=["team", "wins", "losses", "win_pct",
+                                     "point_diff", "prev_rank"])
+    g["home"] = g["home_team"].map(canonical_team)
+    g["away"] = g["away_team"].map(canonical_team)
+
+    rec = {t: {"w": 0, "l": 0, "pf": 0, "pa": 0} for t in CANONICAL_TEAMS}
+    for r in g.itertuples(index=False):
+        for team, pts, opp in ((r.home, r.home_score, r.away_score),
+                               (r.away, r.away_score, r.home_score)):
+            if team not in rec:
+                continue
+            d = rec[team]
+            d["pf"] += pts; d["pa"] += opp
+            d["w"] += int(pts > opp); d["l"] += int(pts < opp)   # ties: neither
+
+    rows = [{"team": t, "wins": d["w"], "losses": d["l"],
+             "win_pct": d["w"] / (d["w"] + d["l"]) if (d["w"] + d["l"]) else 0.0,
+             "point_diff": d["pf"] - d["pa"]} for t, d in rec.items()]
+    df = pd.DataFrame(rows)
+    df = df[(df["wins"] + df["losses"]) > 0]                      # teams that played
+    df = df.sort_values(["win_pct", "point_diff"], ascending=False, ignore_index=True)
+    df["prev_rank"] = df.index + 1
+    return df
+
+
 def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     """Per-team SB outlook (roster readiness blended with org) + rank.
 
