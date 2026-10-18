@@ -1,0 +1,404 @@
+{
+  "model": "claude-sonnet-4-6",
+  "n_items": 20,
+  "correct_rate": 1.0,
+  "grounded_rate": 0.95,
+  "table_rate": 1.0,
+  "executed_rate": 1.0,
+  "pass_rate": 0.95,
+  "items": [
+    {
+      "id": "champ_premium_top",
+      "kind": "label",
+      "question": "Which single position group has the highest Super Bowl champion cap premium?",
+      "answer": "**Tight End (TE) carries the highest Super Bowl champion cap premium \u2014 +0.41% of the league cap above average.**\n\nHere's the full picture of the top positions by champion premium:\n\n| Pos | League Avg | Champion Avg | **Premium** |\n|-----|-----------|-------------|------------|\n| **TE** | 4.37% | 4.77% | **+0.41%** |\n| EDGE | 8.38% | 8.73% | +0.35% |\n| QB | 8.01% | 8.25% | +0.24% |\n| WR | 7.31% | 7.50% | +0.18% |\n| SPEC | 2.36% | 2.51% | +0.15% |\n\n### Key Takeaways\n\n- **TE is the clearest differentiator.** Champions spend ~4.77% of the cap at tight end versus the league norm of 4.37% \u2014 a meaningful ~9% relative over-investment. Think Travis Kelce/Patrick Mahomes Chiefs, Rob Gronkowski Patriots, or George Kittle 49ers windows.\n- **EDGE is a close second** (+0.35%), reinforcing that a dominant pass-rusher is nearly as valuable.\n- **RB is the most negative premium (-0.37%)**, confirming the long-held cap wisdom that championship teams *de-prioritize* expensive running backs.\n- **OL and IDL also skew negative**, suggesting champions find value at those spots rather than paying market rate.\n\n> *Based on finalized seasons 2011\u20132024 to ensure only real outcomes are included.*",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.913,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "TE"
+      ],
+      "sql": [
+        "\nSELECT pos_group,\n       ROUND(league_avg_pct * 100, 2)    AS league_avg_pct,\n       ROUND(champion_avg_pct * 100, 2)  AS champion_avg_pct,\n       ROUND(champion_premium * 100, 2)  AS champion_premium_pct\nFROM main.mart_position_success\nORDER BY champion_premium DESC\nLIMIT 10;\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "champ_value_pos",
+      "kind": "label",
+      "question": "Which position group is the biggest value for Super Bowl winners, i.e. has the most negative champion premium?",
+      "answer": "**Linebacker (LB) is the biggest \"value play\" for Super Bowl champions** \u2014 it has the most negative champion premium by a wide margin.\n\nHere are the key findings:\n\n| Pos Group | League Avg Cap % | Champion Avg Cap % | Champion Premium |\n|-----------|------------------|--------------------|-----------------|\n| **LB** | 4.84% | 3.94% | **\u22120.90%** |\n| RB | 4.10% | 3.73% | \u22120.37% |\n| IDL | 6.36% | 6.12% | \u22120.24% |\n| OL | 10.33% | 10.24% | \u22120.09% |\n\n### What This Means\n\n- **LB: \u22120.90 pp below average.** Super Bowl winners consistently *underspend* at linebacker relative to the league norm. Champions allocate nearly a full percentage point less of the cap to LBs than a typical team \u2014 the strongest signal in the entire dataset that this is a position where you can win cheap.\n- **RB (\u22120.37 pp) and IDL (\u22120.24 pp)** are also meaningful underspend positions for champions, reinforcing the long-held view that star running backs and interior D-linemen are poor cap investments.\n- On the flip side, champions *overspend* at **TE (+0.41 pp), EDGE (+0.35 pp), and QB (+0.24 pp)** \u2014 those are the positions where investing above average correlates with winning it all.\n\n**Bottom line:** If you're building a championship roster, linebacker is the position to go bargain-hunting at. Redirect those savings toward your pass-catchers, pass-rushers, and franchise QB.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "LB"
+      ],
+      "sql": [
+        "SELECT pos_group, ROUND(league_avg_pct * 100, 2) AS league_avg_pct, ROUND(champion_avg_pct * 100, 2) AS champion_avg_pct, ROUND(champion_premium * 100, 2) AS champion_premium FROM main.mart_position_success ORDER BY champion_premium ASC;"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "league_top_spend_pos",
+      "kind": "label",
+      "question": "Across the whole league, which position group has the highest average cap share?",
+      "answer": "**Offensive Line (OL) commands the highest average cap share across the league at 10.33% of the salary cap** \u2014 a full 2 percentage points ahead of the next group.\n\nHere's the full ranking for context:\n\n| Rank | Position | Avg Cap Share |\n|------|----------|--------------|\n| 1 | **OL** | **10.33%** |\n| 2 | EDGE | 8.38% |\n| 3 | QB | 8.01% |\n| 4 | WR | 7.31% |\n| 5 | IDL | 6.36% |\n| 6 | CB | 5.45% |\n| 7 | S | 5.17% |\n| 8 | LB | 4.84% |\n| 9 | TE | 4.37% |\n| 10 | RB | 4.10% |\n| 11 | SPEC | 2.36% |\n\nA few key takeaways:\n- **OL's dominance** reflects the sheer roster depth required \u2014 teams typically carry 8\u201310 offensive linemen, spreading significant cap dollars across the unit.\n- **EDGE edges out QB** for second place, underlining the premium the modern NFL places on pass rushers.\n- **RB and TE** sit near the bottom, consistent with the league-wide trend of devaluing those positions in free agency.\n\n> These figures are drawn from finalized seasons (2011\u20132024) via the `mart_position_success` table.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.643,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "OL"
+      ],
+      "sql": [
+        "\nSELECT pos_group, ROUND(league_avg_pct * 100, 2) AS league_avg_pct\nFROM main.mart_position_success\nORDER BY league_avg_pct DESC\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "qb_champ_share_pct",
+      "kind": "value",
+      "question": "What percentage of the salary cap do Super Bowl champions spend on the quarterback position on average?",
+      "answer": "Great question! Here's what the data shows for **QB cap spending by Super Bowl champions** (covering finalized seasons, 2011\u20132024):\n\n| Metric | Cap % |\n|---|---|\n| \ud83c\udfc8 **League Average** | **8.01%** |\n| \ud83c\udfc6 **Super Bowl Finalists Avg** | **8.01%** |\n| \ud83e\udd47 **Super Bowl Champions Avg** | **8.25%** |\n| \ud83d\udcc8 **Champion Premium** | **+0.24%** |\n\n### Key Takeaways:\n- **Super Bowl champions spend about 8.25% of the salary cap on QB**, only marginally more than the league average of 8.01%.\n- The **champion premium is a slim +0.24 percentage points**, meaning winning a Super Bowl is *not* strongly correlated with spending big at QB relative to the rest of the league.\n- Interestingly, **finalists and the league average are identical at 8.01%**, suggesting that teams across the board spend similarly at QB regardless of postseason outcome.\n\n> **Analyst Note:** This finding challenges the conventional wisdom that you must pay top dollar for a QB to win a championship. Teams can win with both elite, well-paid QBs *and* cost-controlled ones (e.g., rookies on rookie deals), which likely averages out the spending close to the league norm.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.8,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "8.3"
+      ],
+      "sql": [
+        "SELECT pos_group, ROUND(league_avg_pct * 100, 2) AS league_avg_pct, ROUND(finalist_avg_pct * 100, 2) AS finalist_avg_pct, ROUND(champion_avg_pct * 100, 2) AS champion_avg_pct, ROUND(champion_premium * 100, 2) AS champion_premium FROM main.mart_position_success WHERE pos_group = 'QB'"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "edge_premium_norm_pct",
+      "kind": "value",
+      "question": "On the era-normalized view, what is the EDGE position's champion premium in percentage points?",
+      "answer": "**On the era-normalized view, EDGE rushers carry a champion premium of \u20132.08 percentage points.**\n\nHere's the breakdown:\n\n| Metric | Cap Share (fraction) | As % of League Cap |\n|---|---|---|\n| League Average (normalized) | 0.1703 | 17.03% |\n| Champion Average (normalized) | 0.1495 | 14.95% |\n| **Champion Premium (normalized)** | **\u20130.0208** | **\u20132.08 pp** |\n\n**What this means:** Super Bowl winners actually *under-invest* at EDGE relative to the league average by about **2.1 percentage points** on a normalized (era-adjusted) basis. Champions spend roughly **14.95%** of their cap on EDGE rushers, while the typical NFL team spends **17.03%**.\n\n**Key takeaway:** This is one of the more notable negative premiums in the league \u2014 championship rosters consistently deprioritize paying top dollar for edge rushers relative to their peers. This could reflect a few things: elite teams finding cap-efficient pass-rush via the draft or cheap contracts, or simply that cap resources are being redirected to positions (like QB or OL) that correlate more strongly with winning.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "-2.08"
+      ],
+      "sql": [
+        "SELECT pos_group, league_avg_norm, champion_avg_norm, champion_premium_norm FROM main.mart_position_success WHERE pos_group = 'EDGE'"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "n_pos_groups",
+      "kind": "value",
+      "question": "How many position groups are tracked in the champion premium analysis?",
+      "answer": "**11 position groups** are tracked in the champion premium analysis. They are:\n\n| Side of Ball | Position Groups |\n|---|---|\n| **Offense** | QB, RB, WR, TE, OL |\n| **Defense** | IDL, EDGE, LB, CB, S |\n| **Special Teams** | SPEC |\n\nNote that **UNK** (unknown/unclassified) is defined in the schema but has no rows in `mart_position_success`, meaning it's filtered out of the outcome analysis \u2014 only cleanly categorized spending is used to evaluate champion spending patterns.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "11"
+      ],
+      "sql": [
+        "SELECT COUNT(*) AS n_pos_groups, LIST(pos_group ORDER BY pos_group) AS pos_groups FROM main.mart_position_success;"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "n_sb_winners_window",
+      "kind": "value",
+      "question": "How many Super Bowl-winning team-seasons are in the finalized 2011 to 2024 data?",
+      "answer": "There are **14 Super Bowl-winning team-seasons** in the finalized 2011\u20132024 window \u2014 exactly one per season, as you'd expect, since only one team wins the Super Bowl each year. This gives us a clean 14-champion sample to benchmark positional spending patterns against league averages.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "14"
+      ],
+      "sql": [
+        "\nSELECT COUNT(*) AS sb_winning_team_seasons\nFROM main.fct_team_season\nWHERE season BETWEEN 2011 AND 2024\n  AND sb_win = 1;\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "top_qb_spend_team_season",
+      "kind": "label",
+      "question": "In a completed season (2011 through 2024), which team and season had the largest share of its cap spent on the quarterback position?",
+      "answer": "**The 2024 Dallas Cowboys hold the record**, committing **20.3% of their salary cap** to the quarterback position \u2014 the highest QB cap share of any team in any completed season from 2011 through 2024.\n\nHere are the top five for context:\n\n| Rank | Team | Season | QB Cap Share |\n|------|------|--------|-------------|\n| 1 | **DAL** | **2024** | **20.3%** |\n| 2 | IND | 2020 | 19.6% |\n| 3 | LAR | 2024 | 19.6% |\n| 4 | MIA | 2017 | 19.1% |\n| 5 | ARI | 2024 | 18.8% |\n\n**Key context:**\n- Dallas's 20.3% figure reflects the enormous cap hit from **Dak Prescott's** contract.\n- Indianapolis in 2020 and Miami in 2017 likely reflect dead-cap or restructure situations \u2014 both were years without a clear franchise QB, making the high percentage even more painful.\n- The Rams' 2024 entry is driven by **Matthew Stafford's** extension.\n- Spending one-fifth of the entire cap on a single position is an extraordinary commitment \u2014 and a cautionary tale about QB market inflation.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.913,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "DAL",
+        "2024"
+      ],
+      "sql": [
+        "\nSELECT team, season, ROUND(pct_qb * 100, 2) AS qb_cap_pct\nFROM main.fct_team_season\nWHERE season BETWEEN 2011 AND 2024\nORDER BY pct_qb DESC\nLIMIT 5;\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "league_cap_2024",
+      "kind": "value",
+      "question": "What was the NFL per-team salary cap in the 2024 season?",
+      "answer": "The NFL per-team salary cap in the **2024 season was $255,400,000** (approximately **$255.4 million**).\n\nThis figure represents the maximum amount each of the 32 teams could spend on player contracts counting against the cap for that league year. It marked another record-high cap at the time, continuing the upward trend driven by the league's television and revenue-sharing agreements.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": false,
+      "grounded_ratio": 0.5,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "255.4"
+      ],
+      "sql": [
+        "SELECT season, league_cap FROM main.dim_season WHERE season = 2024"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "sb_winner_2023",
+      "kind": "label",
+      "question": "Which team won the Super Bowl for the 2023 season?",
+      "answer": "The **Kansas City Chiefs (KC)** won Super Bowl LVIII for the **2023 season**, defeating the **San Francisco 49ers (SF)** in the championship game.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "KC"
+      ],
+      "sql": [
+        "SELECT winner, loser FROM raw.super_bowls WHERE season = 2023;"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "value_board_top",
+      "kind": "label",
+      "question": "Who is the single most cap-efficient player on the value board?",
+      "answer": "**Puka Nacua (LAR, WR) is the single most cap-efficient player on the value board.**\n\nHere's why the numbers are so compelling:\n\n| Metric | Value |\n|---|---|\n| **Value Index** | **84** (highest on the board) |\n| **Grade** | **A** |\n| **Caliber Percentile** | **86th** \u2014 legitimately elite WR talent |\n| **Pay Percentile** | **2nd** \u2014 essentially playing for free relative to peers |\n| **APY** | **$1.0M** \u2014 still on his rookie deal |\n| **Age** | **25.3** \u2014 in his prime |\n| **Madden OVR** | **88** |\n\nThe core story: Nacua plays like a top-15% wide receiver but earns in the bottom 2% of WR salaries. That **84-point gap between caliber and pay** is what rockets him to the top of the value board. The Rams are getting A-grade production at a rounding-error cost \u2014 a situation that will change dramatically once he hits his next contract. Enjoy it while it lasts, LA.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.857,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "Puka Nacua"
+      ],
+      "sql": [
+        "SELECT player, team, pos_group, age, madden_ovr, grade, caliber_pct, pay_pct, apy, value_index, value FROM raw.value_board ORDER BY value_index DESC LIMIT 1"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "value_board_top_wr",
+      "kind": "label",
+      "question": "Who is the most cap-efficient wide receiver by value index?",
+      "answer": "## \ud83c\udfc6 Most Cap-Efficient WR: **Puka Nacua (LAR)**\n\nPuka Nacua is the clear standout as the most cap-efficient wide receiver in the warehouse, and it's not particularly close:\n\n| Metric | Value |\n|---|---|\n| **Value Index** | **84** (next best: 45) |\n| **Grade** | A |\n| **Caliber Percentile** | 86th |\n| **Pay Percentile** | 2nd (!!) |\n| **APY** | $1.0M |\n| **Age** | 25.3 |\n\n### Why He's #1\nThe secret is the massive **gap between talent and pay**. Nacua grades out at the **86th percentile in player caliber** (Madden OVR of 88, an \"A\" grade) yet is paid at just the **2nd percentile** of WR contracts \u2014 a $1M APY deal that screams pre-extension rookie contract. That 84-point spread between caliber (86) and pay (2) produces an almost unmatched value index of 84.\n\n### Key Caveat\nThis level of efficiency is **fleeting**. Nacua is 25 and approaching the point where the Rams will need to extend him at market rate. Once he signs a new deal, his pay percentile will jump dramatically and this arbitrage disappears. He is a prime **extension candidate** and likely a significant cap hit in future seasons.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "Puka Nacua"
+      ],
+      "sql": [
+        "\nSELECT player, team, pos_group, age, madden_ovr, grade, caliber_pct, pay_pct, apy, value_index, value\nFROM raw.value_board\nWHERE pos_group = 'WR'\nORDER BY value_index DESC\nLIMIT 10\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "value_board_top_qb",
+      "kind": "label",
+      "question": "Which quarterback offers the best value by value index?",
+      "answer": "## Best QB Value by Value Index: **Tua Tagovailoa** \ud83c\udfc6\n\nTua tops the QB value board with a **value index of 42**, and it's not particularly close. Here's the breakdown:\n\n| Rank | Player | Team | Value Index | Caliber % | Pay % | APY |\n|------|--------|------|-------------|-----------|-------|-----|\n| 1 | **Tua Tagovailoa** | ATL | **42** | 46th | 4th | $1.2M |\n| 2 | Jayden Daniels | WAS | 35 | 65th | 29th | $9.4M |\n| 2 | Lamar Jackson | BAL | 35 | 98th | 62nd | $52.0M |\n| 4 | Patrick Mahomes | KC | 33 | 88th | 54th | $45.0M |\n| 5 | Geno Smith | NYJ | 25 | 38th | 12th | $3.3M |\n\n### Key Takeaways:\n\n- **Tua Tagovailoa** is the standout value play \u2014 his **caliber percentile (46) dwarfs his pay percentile (4)**, with an APY of just **$1.2M**. That's an enormous gap between production tier and cost, likely reflecting an injury-discounted or restructured deal.\n\n- **Jayden Daniels** is the best value among *elite-tier* QBs \u2014 at only 25.7 years old, he grades at the 65th caliber percentile while sitting at just the 29th pay percentile ($9.4M APY). Huge upside here.\n\n- **Lamar Jackson and Mahomes** both crack the top 4 despite massive contracts (~$52M and $45M APY, respectively), because their talent grades (98th and 88th caliber percentile) are so exceptional that even top-of-market pay looks reasonable relative to their output.\n\n- **C.J. Stroud** at $9.1M APY is worth watching \u2014 at just 24.9 years old, he's underpriced relative to where his trajectory is pointing.\n\n> \u26a0\ufe0f **Caveat:** The value board reflects current/projected roster and contract data. Tua's low APY may reflect a team-friendly restructure or an injury situation \u2014 always worth cross-checking against cap hit details before acting on it in a trade or FA context.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.885,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "Tua Tagovailoa"
+      ],
+      "sql": [
+        "\nSELECT player, team, pos_group, age, madden_ovr, grade, caliber_pct, pay_pct, apy, value_index, value\nFROM raw.value_board\nWHERE pos_group = 'QB'\nORDER BY value_index DESC\nLIMIT 10;\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "best_cb_unit",
+      "kind": "label",
+      "question": "Which team has the strongest cornerback unit by unit score?",
+      "answer": "**The Philadelphia Eagles have the strongest cornerback unit**, with a unit score of **0.90** (90.0) \u2014 the highest in the league.\n\nHere's a quick breakdown of the top 5 CB units:\n\n| Rank | Team | Unit Score | Strength | Top Player |\n|------|------|-----------|----------|------------|\n| 1 | **PHI** | 0.900 | 100.0 | Cooper DeJean |\n| 2 | DEN | 0.867 | 96.9 | Pat Surtain II |\n| 3 | BUF | 0.848 | 93.8 | C.J. Gardner-Johnson |\n| 4 | CHI | 0.832 | 90.6 | Jaylon Johnson |\n| 5 | IND | 0.826 | 87.5 | Cam Taylor-Britt |\n\n**Key Takeaways:**\n- **Philadelphia** tops the board across a deep 15-player CB group, with Cooper DeJean as the headliner and a perfect 100.0 strength rating \u2014 suggesting they have not just the highest-scored unit, but also the greatest depth.\n- **Denver** slots in at #2 behind the elite Pat Surtain II, one of the best individual corners in the NFL.\n- **Buffalo** rounds out the top 3, bolstered by the addition of C.J. Gardner-Johnson.\n- Notably, even the **Kansas City Chiefs** (reigning Super Bowl contenders) rank only 7th in CB unit score, which could be a roster vulnerability heading into the season.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.682,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "PHI"
+      ],
+      "sql": [
+        "SELECT team, pos_group, unit_score, n_players, top_player, strength\nFROM raw.roster_strength\nWHERE pos_group = 'CB'\nORDER BY unit_score DESC\nLIMIT 10;"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "best_qb_unit",
+      "kind": "label",
+      "question": "Which team has the highest-graded quarterback unit?",
+      "answer": "There's actually a **seven-way tie at the top** for the highest-graded QB unit, all scoring a perfect **unit_score of 1.0** with a **strength grade of 90.6**:\n\n| Team | Top QB |\n|------|--------|\n| **BAL** | Lamar Jackson |\n| **BUF** | Josh Allen |\n| **CIN** | Joe Burrow |\n| **DET** | Jared Goff |\n| **MIN** | Kyler Murray |\n| **TB** | Baker Mayfield |\n| **WAS** | Jayden Daniels |\n\nThese seven teams all share the maximum unit score, driven by their elite starting quarterbacks. The next tier down is **Green Bay (Jordan Love)** at 0.998 unit score / 78.1 strength, followed by **Denver (Bo Nix)** and **Seattle (Sam Darnold)** at 0.992.\n\nThe perfect 1.0 score indicates these units are at the ceiling of the grading scale \u2014 not a surprise given that group includes the reigning MVP (Lamar Jackson), a two-time MVP (Josh Allen), and several other established franchise cornerstones.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "BAL"
+      ],
+      "sql": [
+        "\nSELECT team, pos_group, unit_score, n_players, top_player, strength\nFROM raw.roster_strength\nWHERE pos_group = 'QB'\nORDER BY unit_score DESC\nLIMIT 10\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "rb_champ_direction",
+      "kind": "label",
+      "question": "Do Super Bowl champions tend to spend more or less than the league average on running backs?",
+      "answer": "**Super Bowl champions consistently spend *less* on running backs than the league average.**\n\nHere are the key figures (as a share of the league salary cap):\n\n| Group | RB Cap Share |\n|---|---|\n| League Average | 4.10% |\n| Super Bowl Finalists | 4.10% |\n| **Super Bowl Champions** | **3.73%** |\n| **Champion Premium** | **\u22120.37 pp** |\n\n### What this tells us:\n- **Champions allocate about 0.37 percentage points *below* the league average** at RB \u2014 a meaningful discount at a position that typically commands ~4% of the cap.\n- Interestingly, **finalists spend exactly at the league average**, suggesting that *over-investing* in the backfield doesn't help teams reach the Super Bowl, and **under-investing at RB is actually a trait of winners**.\n- This aligns with the modern NFL's \"running back by committee\" philosophy \u2014 champions tend to redirect those cap dollars toward premium positions like QB, offensive line, or pass rushers rather than paying top dollar for a featured back.\n\n**Bottom line:** If you want to build a champion, the data suggests running backs are one of the best positions to *save money* on relative to the rest of the league.",
+      "n_queries": 1,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.833,
+      "table_used": true,
+      "executed": true,
+      "expected": [
+        "less"
+      ],
+      "sql": [
+        "\nSELECT\n    pos_group,\n    ROUND(league_avg_pct * 100, 2)      AS league_avg_pct,\n    ROUND(finalist_avg_pct * 100, 2)    AS finalist_avg_pct,\n    ROUND(champion_avg_pct * 100, 2)    AS champion_avg_pct,\n    ROUND(champion_premium * 100, 2)    AS champion_premium_pct\nFROM main.mart_position_success\nWHERE pos_group = 'RB'\n"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "adv_concussions",
+      "kind": "adversarial",
+      "question": "How many concussions did each team suffer in the 2024 season?",
+      "answer": "I'm sorry, but **concussion and injury data is outside the scope of this warehouse**. The GridironIQ database is focused on **NFL salary-cap analytics and roster construction**, and its schema does not include any injury or medical tracking tables. Here's what *is* available:\n\n| Category | Tables |\n|---|---|\n| Cap spending | `main.fct_team_season`, `main.stg_positional_spending`, `raw.player_year_caps` |\n| Roster info | `raw.roster_2025`, `raw.roster_2026`, `raw.player_talent` |\n| Player grades | `raw.value_board`, `raw.roster_strength`, `raw.madden_2025` |\n| Game outcomes | `raw.super_bowls`, `raw.team_outcomes` |\n| Snap counts | `raw.snap_counts_2024` |\n\nFor concussion/injury data, I'd recommend checking:\n- **NFL's official injury reports** at nfl.com\n- **Pro Football Reference** (pro-football-reference.com) under their injury logs\n- **ESPN** or **NFLInjuries.com** for historical game-by-game injury tracking\n\nIs there a **cap, roster, or performance question** I can help you dig into instead?",
+      "n_queries": 0,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [],
+      "sql": [],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "adv_head_coach",
+      "kind": "adversarial",
+      "question": "Which head coach has the best career playoff win percentage according to this data?",
+      "answer": "I appreciate the question, but after reviewing the full warehouse schema, **there are no tables containing head coach data or game-by-game win/loss records** in this database. The GridironIQ warehouse is focused on:\n\n- **Salary cap & positional spending** (`main.fct_team_season`, `main.stg_positional_spending`, etc.)\n- **Roster talent & free agents** (`raw.player_talent`, `raw.free_agents`, etc.)\n- **Team-level outcomes** (Super Bowl appearances/wins in `raw.super_bowls` and `raw.team_outcomes`)\n- **Player ratings & value** (`raw.madden_2025`, `raw.value_board`, etc.)\n\nTo answer a head coach playoff win percentage question, you'd need a source like **Pro Football Reference, ESPN, or NFL.com** that tracks coach-level game logs.\n\n---\n\nHere are some **related questions I *can* answer** with this data:\n\n1. \ud83c\udfc6 **Which teams have the best Super Bowl conversion rate given their cap spending strategy?**\n2. \ud83d\udcb0 **What positional spending profile gives a team the best shot at winning the Super Bowl?**\n3. \ud83d\udcca **Which franchises have been to the most Super Bowls since 2011?**\n\nWould you like to explore any of these angles instead?",
+      "n_queries": 0,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [],
+      "sql": [],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "adv_predict_2027",
+      "kind": "adversarial",
+      "question": "Which team does the data predict will win the Super Bowl in the 2027 season?",
+      "answer": "Here's a full analytical breakdown. I want to be crystal clear upfront: **this database does not simulate games or predict Super Bowl winners.** What it *does* contain is:\n1. **Historical champion spending DNA** \u2014 what cap allocation patterns correlate with winning\n2. **2027 forward cap projections** \u2014 how teams are currently structured\n3. **Roster strength grades** \u2014 talent assessments right now\n4. **Maxer League rankings** \u2014 a composite org/roster outlook score\n\nLet me synthesize all of that into a data-driven answer.\n\n---\n\n## \ud83c\udfc6 Data-Driven 2027 Super Bowl Contender Analysis\n\n### Step 1 \u2014 What Does a Champion's Cap Look Like?\n\n| Position | League Avg | Champion Avg | Champion Premium |\n|---|---|---|---|\n| **EDGE** | 8.4% | **8.7%** | **+0.35%** \u2190 invest here |\n| **TE** | 4.4% | **4.8%** | **+0.41%** \u2190 invest here |\n| **LB** | 4.8% | **3.9%** | **\u22120.90%** \u2190 underpay here |\n| **RB** | 4.1% | **3.7%** | **\u22120.37%** \u2190 underpay here |\n| QB | 8.0% | 8.3% | +0.24% |\n| WR | 7.3% | 7.5% | +0.18% |\n\nChampions over-invest at **EDGE and TE**, and save money at **LB and RB**.\n\n---\n\n### Step 2 \u2014 How Do 2027 Contenders Stack Up Against the Blueprint?\n\n| Team | QB% | WR% | EDGE% | TE% | LB% | OL% | Total% | Champion EDGE Fit |\n|---|---|---|---|---|---|---|---|---|\n| **PHI** | 12.9 | 7.5 | **9.1** \u2705 | 3.2 | 5.9 | 21.6 | 85.8 | \u2705 Near champion avg (8.7%) |\n| **BUF** | 17.9 | 17.6 | 14.1 | 6.1 | 4.0 \u2705 | 18.3 | 108.3 | Over-invested |\n| **DET** | 19.1 | 13.2 | 4.9 \u274c | 0.8 \u274c | 3.0 | 14.4 | 78.5 | Under-invested |\n| **KC** | 26.1 | 4.0 \u274c | 5.9 | 4.3 \u2705 | 6.6 | 17.4 | 91.4 | Under-invested |\n| **LAR** | 9.7 | 3.0 \u274c | 5.4 | 2.0 \u274c | 3.8 | 8.8 | 69.7 | Incomplete roster |\n\n---\n\n### Step 3 \u2014 Composite Outlook (Maxer League Rankings)\n\n| Rank | Team | Roster Readiness | Org Score | Outlook |\n|---|---|---|---|---|\n| **1** | **PHI** | 83.9 | **96.9** | **89.8** |\n| **2** | **BUF** | 83.7 | 93.8 | 88.2 |\n| **3** | DET | **90.3** | 75.0 | 83.4 |\n| **4** | LAR | 78.6 | 82.8 | 80.5 |\n| **5** | KC | 71.1 | 90.6 | 79.9 |\n\n---\n\n### \ud83c\udfaf The Data's Verdict: Philadelphia Eagles\n\nThe Eagles are the most well-rounded team across every dimension the data tracks:\n\n- \ud83e\udd47 **#1 overall ranking** (Outlook: 89.8) with the league's **best org score (96.9)**\n- \ud83d\udcd0 **Best cap alignment with the champion template**: EDGE at 9.1% (champion avg: 8.7%), WR at exactly 7.5% (matches champion avg perfectly)\n- \ud83d\udcaa **Elite roster units**: CB (100th percentile strength, led by Cooper DeJean), EDGE (93.8%, Jonathan Greenard), IDL (93.8%, Jordan Davis), OL (87.5%, Jordan Mailata)\n- \ud83d\udcc9 **Total cap at only 85.8%** \u2014 meaningful room to add pieces before 2027\n- \ud83c\udfe2 **Organizational depth** (96.9 org score) suggests they are built to sustain, not just peak\n\n**Buffalo Bills** are the closest challenger \u2014 Josh Allen gives them a transcendent QB and their roster grades are nearly as strong \u2014 but their 2027 cap is projected at **108.3% of the cap**, meaning they'll likely need painful cuts/restructures, and their EDGE spending is nearly double the champion average (a sign of imbalance).\n\n**Kansas City** still has Mahomes, which is never to be ignored (org score 90.6), but their WR investment (4.0%) and EDGE investment (5.9%) are both well below what champion profiles demand, and the roster shows cracks (IDL score 21.9, LB 15.6).\n\n---\n\n> \u26a0\ufe0f **Key Caveat:** 2027 is a **forward projection season** \u2014 rosters are incomplete and no real outcomes exist. This analysis reflects *current cap structures and roster talent grades*, not game simulations. The Eagles check the most boxes the data knows how to measure, but football is famously unpredictable (and Patrick Mahomes exists).",
+      "n_queries": 5,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 1.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [],
+      "sql": [
+        "SELECT DISTINCT season FROM main.fct_team_season ORDER BY season DESC LIMIT 10",
+        "SELECT team, roster_readiness, org_score, outlook, rank FROM raw.maxer_league ORDER BY rank ASC LIMIT 32",
+        "-- Champion spending benchmarks by position\nSELECT pos_group,\n       ROUND(league_avg_pct * 100, 2)    AS league_avg_pct,\n       ROUND(champion_avg_pct * 100, 2)  AS champion_avg_pct,\n       ROUND(champion_premium * 100, 2)  AS champion_premium_pct\nFROM main.mart_position_success\nORDER BY ABS(champion_premium) DESC",
+        "-- 2027 cap spending for top-ranked teams (PHI, BUF, DET, LAR, KC)\nSELECT team, \n       ROUND(pct_qb*100,1) AS qb,\n       ROUND(pct_rb*100,1) AS rb,\n       ROUND(pct_wr*100,1) AS wr,\n       ROUND(pct_te*100,1) AS te,\n       ROUND(pct_ol*100,1) AS ol,\n       ROUND(pct_idl*100,1) AS idl,\n       ROUND(pct_edge*100,1) AS edge,\n       ROUND(pct_lb*100,1) AS lb,\n       ROUND(pct_cb*100,1) AS cb,\n       ROUND(pct_s*100,1) AS s,\n       ROUND(total_pct*100,1) AS total_pct\nFROM main.fct_team_season\nWHERE season = 2027\n  AND team IN ('PHI','BUF','DET','LAR','KC','DEN','PIT','HOU')\nORDER BY team",
+        "-- Roster strength for top contenders\nSELECT team, pos_group, ROUND(unit_score,1) AS unit_score, strength, top_player\nFROM raw.roster_strength\nWHERE team IN ('PHI','BUF','DET','LAR','KC')\nORDER BY team, unit_score DESC"
+      ],
+      "judge_score": null,
+      "judge_reason": null
+    },
+    {
+      "id": "adv_ticket_prices",
+      "kind": "adversarial",
+      "question": "What was the average ticket price for each stadium last year?",
+      "answer": "That question is outside the scope of what I can answer here. The **GridironIQ warehouse is an NFL salary-cap and roster analytics platform**, and it does not contain any ticket pricing or stadium revenue data.\n\nHere's what I *can* help you with using the available data:\n\n- \ud83d\udcb0 **Cap spending** \u2013 positional spending breakdowns by team and season\n- \ud83c\udfc6 **Championship analysis** \u2013 how Super Bowl winners allocate their cap vs. league average\n- \ud83d\udccb **Roster evaluation** \u2013 roster strength grades, player talent scores, and value board rankings\n- \ud83d\udcca **Contract data** \u2013 historical contracts, APY, guaranteed money, and cap hits\n- \ud83d\udd2e **2025/2026 projections** \u2013 forward-looking cap allocations and roster composition\n\nFor ticket pricing data, I'd suggest resources like **Statista**, **SeatGeek**, or the **NFL's official financial disclosures**.\n\nIs there a cap or roster question I can dig into for you?",
+      "n_queries": 0,
+      "correct": true,
+      "grounded": true,
+      "grounded_ratio": 0.0,
+      "table_used": true,
+      "executed": true,
+      "expected": [],
+      "sql": [],
+      "judge_score": null,
+      "judge_reason": null
+    }
+  ],
+  "judge_model": null,
+  "judge_mean": null
+}

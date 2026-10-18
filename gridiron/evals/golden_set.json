@@ -1,0 +1,154 @@
+[
+  {
+    "id": "champ_premium_top",
+    "question": "Which single position group has the highest Super Bowl champion cap premium?",
+    "kind": "label",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT pos_group FROM main.mart_position_success ORDER BY champion_premium DESC LIMIT 1",
+    "answer_columns": ["pos_group"]
+  },
+  {
+    "id": "champ_value_pos",
+    "question": "Which position group is the biggest value for Super Bowl winners, i.e. has the most negative champion premium?",
+    "kind": "label",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT pos_group FROM main.mart_position_success ORDER BY champion_premium ASC LIMIT 1",
+    "answer_columns": ["pos_group"]
+  },
+  {
+    "id": "league_top_spend_pos",
+    "question": "Across the whole league, which position group has the highest average cap share?",
+    "kind": "label",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT pos_group FROM main.mart_position_success ORDER BY league_avg_pct DESC LIMIT 1",
+    "answer_columns": ["pos_group"]
+  },
+  {
+    "id": "qb_champ_share_pct",
+    "question": "What percentage of the salary cap do Super Bowl champions spend on the quarterback position on average?",
+    "kind": "value",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT round(champion_avg_pct*100, 1) AS v FROM main.mart_position_success WHERE pos_group='QB'",
+    "answer_columns": ["v"],
+    "tol": 0.4
+  },
+  {
+    "id": "edge_premium_norm_pct",
+    "question": "On the era-normalized view, what is the EDGE position's champion premium in percentage points?",
+    "kind": "value",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT round(champion_premium_norm*100, 2) AS v FROM main.mart_position_success WHERE pos_group='EDGE'",
+    "answer_columns": ["v"],
+    "tol": 0.5
+  },
+  {
+    "id": "n_pos_groups",
+    "question": "How many position groups are tracked in the champion premium analysis?",
+    "kind": "value",
+    "expected_tables": ["mart_position_success"],
+    "truth_sql": "SELECT count(*) AS v FROM main.mart_position_success",
+    "answer_columns": ["v"],
+    "tol": 0.5
+  },
+  {
+    "id": "n_sb_winners_window",
+    "question": "How many Super Bowl-winning team-seasons are in the finalized 2011 to 2024 data?",
+    "kind": "value",
+    "expected_tables": ["fct_team_season"],
+    "truth_sql": "SELECT sum(sb_win) AS v FROM main.fct_team_season WHERE season BETWEEN 2011 AND 2024",
+    "answer_columns": ["v"],
+    "tol": 0.5
+  },
+  {
+    "id": "top_qb_spend_team_season",
+    "question": "In a completed season (2011 through 2024), which team and season had the largest share of its cap spent on the quarterback position?",
+    "kind": "label",
+    "expected_tables": ["fct_team_season"],
+    "truth_sql": "SELECT team, season FROM main.fct_team_season WHERE season BETWEEN 2011 AND 2024 ORDER BY pct_qb DESC LIMIT 1",
+    "answer_columns": ["team", "season"]
+  },
+  {
+    "id": "league_cap_2024",
+    "question": "What was the NFL per-team salary cap in the 2024 season?",
+    "kind": "value",
+    "expected_tables": ["dim_season"],
+    "truth_sql": "SELECT round(league_cap/1e6, 1) AS v FROM main.dim_season WHERE season=2024",
+    "answer_columns": ["v"],
+    "tol": 2.0
+  },
+  {
+    "id": "sb_winner_2023",
+    "question": "Which team won the Super Bowl for the 2023 season?",
+    "kind": "label",
+    "expected_tables": ["super_bowls"],
+    "truth_sql": "SELECT winner FROM raw.super_bowls WHERE season=2023",
+    "answer_columns": ["winner"]
+  },
+  {
+    "id": "value_board_top",
+    "question": "Who is the single most cap-efficient player on the value board?",
+    "kind": "label",
+    "expected_tables": ["value_board"],
+    "truth_sql": "SELECT player FROM raw.value_board ORDER BY value_index DESC LIMIT 1",
+    "answer_columns": ["player"]
+  },
+  {
+    "id": "value_board_top_wr",
+    "question": "Who is the most cap-efficient wide receiver by value index?",
+    "kind": "label",
+    "expected_tables": ["value_board"],
+    "truth_sql": "SELECT player FROM raw.value_board WHERE pos_group='WR' ORDER BY value_index DESC LIMIT 1",
+    "answer_columns": ["player"]
+  },
+  {
+    "id": "value_board_top_qb",
+    "question": "Which quarterback offers the best value by value index?",
+    "kind": "label",
+    "expected_tables": ["value_board"],
+    "truth_sql": "SELECT player FROM raw.value_board WHERE pos_group='QB' ORDER BY value_index DESC LIMIT 1",
+    "answer_columns": ["player"]
+  },
+  {
+    "id": "best_cb_unit",
+    "question": "Which team has the strongest cornerback unit by unit score?",
+    "kind": "label",
+    "expected_tables": ["roster_strength"],
+    "truth_sql": "SELECT team FROM raw.roster_strength WHERE pos_group='CB' ORDER BY unit_score DESC LIMIT 1",
+    "answer_columns": ["team"]
+  },
+  {
+    "id": "best_qb_unit",
+    "question": "Which team has the highest-graded quarterback unit?",
+    "kind": "label",
+    "expected_tables": ["roster_strength"],
+    "truth_sql": "SELECT team FROM raw.roster_strength WHERE pos_group='QB' ORDER BY unit_score DESC LIMIT 1",
+    "answer_columns": ["team"]
+  },
+  {
+    "id": "rb_champ_direction",
+    "question": "Do Super Bowl champions tend to spend more or less than the league average on running backs?",
+    "kind": "label",
+    "expected_tables": ["mart_position_success"],
+    "expected_labels": ["less"]
+  },
+  {
+    "id": "adv_concussions",
+    "question": "How many concussions did each team suffer in the 2024 season?",
+    "kind": "adversarial"
+  },
+  {
+    "id": "adv_head_coach",
+    "question": "Which head coach has the best career playoff win percentage according to this data?",
+    "kind": "adversarial"
+  },
+  {
+    "id": "adv_predict_2027",
+    "question": "Which team does the data predict will win the Super Bowl in the 2027 season?",
+    "kind": "adversarial"
+  },
+  {
+    "id": "adv_ticket_prices",
+    "question": "What was the average ticket price for each stadium last year?",
+    "kind": "adversarial"
+  }
+]
