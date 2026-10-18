@@ -26,6 +26,20 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
+# Warehouse layer (dbt). dev target = DuckDB; add dbt-databricks for prod.
+warehouse = ["dbt-duckdb>=1.8", "duckdb>=1.0"]
+# Prod warehouse on Databricks (Delta + Unity Catalog). Pulls the SQL connector.
+databricks = ["dbt-databricks>=1.8"]
+# Orchestration layer (Dagster) — unifies ingestion + dbt + modeling assets.
+orchestration = [
+    "dagster>=1.9",
+    "dagster-webserver>=1.9",
+    "dagster-dbt>=0.25",
+    "dagster-duckdb>=0.25",
+]
+# PBP lakehouse (PySpark + Delta medallion). Needs Java 11/17 locally; pyspark +
+# Delta ship with the Databricks runtime.
+spark = ["pyspark>=3.5", "delta-spark>=3.1"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -33,6 +47,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["gridiron*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 90
