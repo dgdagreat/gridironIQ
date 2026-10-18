@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: lint · unit tests · agent eval gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[warehouse,dev]"
+
+      - name: Lint (ruff)
+        run: ruff check gridiron/agent gridiron/evals orchestration warehouse/load_raw.py warehouse/load_delta.py warehouse/build.py tests
+
+      - name: Unit tests
+        run: pytest -q
+
+      # Deterministic agent-quality gate. Re-scores the committed last_run.json —
+      # no API key, no warehouse, no model calls. Fails the build if the scouting
+      # agent regresses below threshold.
+      - name: Agent eval gate
+        run: python -m gridiron.evals.harness --rescore --min-pass 0.9 --min-grounded 0.9
+
+  dbt:
+    name: dbt models compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[warehouse]"
+
+      # Validates the dbt project parses and all model/source/test refs resolve.
+      # (A full `dbt build` runs data-side in the Dagster pipeline, which has the data.)
+      - name: dbt parse
+        working-directory: warehouse
+        run: |
+          dbt deps --profiles-dir .
+          dbt parse --profiles-dir .

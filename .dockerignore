@@ -1,0 +1,21 @@
+.git
+.venv
+__pycache__/
+**/__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+# Build artifacts / local state (mount data at runtime instead of baking it in)
+data/*.duckdb
+data/*.db
+data/raw/*
+data/processed/*
+warehouse/target/
+warehouse/dbt_packages/
+warehouse/logs/
+.dagster_home/
+.tmp_dagster_home_*/
+node_modules/
+frontend/dist/
+frontend/build/
+.DS_Store
