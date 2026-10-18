@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 600" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#38bdf8"/>
+    </marker>
+    <style>
+      .card { fill:#16213a; stroke:#2b3b5c; stroke-width:1.5; }
+      .stage { fill:#38bdf8; font-size:12px; font-weight:700; letter-spacing:1.5px; }
+      .name { fill:#f8fafc; font-size:20px; font-weight:700; }
+      .sub { fill:#93a4bf; font-size:12.5px; }
+      .flow { stroke:#38bdf8; stroke-width:2; fill:none; }
+      .band { fill:#10233b; stroke:#38bdf8; stroke-width:1.5; }
+      .tick { stroke:#33507d; stroke-width:1.5; stroke-dasharray:3 3; }
+    </style>
+  </defs>
+
+  <rect width="1080" height="600" fill="#0b1220"/>
+
+  <!-- header -->
+  <text x="40" y="52" fill="#f8fafc" font-size="26" font-weight="800">GridironIQ</text>
+  <text x="192" y="52" fill="#93a4bf" font-size="17" font-weight="500">Data &amp; AI Engineering Platform</text>
+  <rect x="812" y="33" width="228" height="26" rx="13" fill="#0f2f3a" stroke="#22d3ee" stroke-width="1"/>
+  <text x="926" y="50" fill="#67e8f9" font-size="12" font-weight="600" text-anchor="middle">dev: DuckDB  →  prod: Databricks</text>
+
+  <!-- five stage cards -->
+  <!-- 1 Ingestion -->
+  <g>
+    <rect class="card" x="40" y="150" width="176" height="150" rx="12"/>
+    <text class="stage" x="60" y="182">INGEST</text>
+    <text class="name" x="60" y="212">gridiron pkg</text>
+    <text class="sub" x="60" y="242">OverTheCap</text>
+    <text class="sub" x="60" y="261">nflverse · Madden</text>
+    <text class="sub" x="60" y="280">ESPN rosters</text>
+  </g>
+  <!-- 2 Landing -->
+  <g>
+    <rect class="card" x="256" y="150" width="176" height="150" rx="12"/>
+    <text class="stage" x="276" y="182">LAND</text>
+    <text class="name" x="276" y="212">load_raw.py</text>
+    <text class="sub" x="276" y="242">DuckDB  raw.*</text>
+    <text class="sub" x="276" y="261">columnar warehouse</text>
+    <text class="sub" x="276" y="280">→ Delta on Databricks</text>
+  </g>
+  <!-- 3 Transform -->
+  <g>
+    <rect class="card" x="472" y="150" width="176" height="150" rx="12"/>
+    <text class="stage" x="492" y="182">TRANSFORM</text>
+    <text class="name" x="492" y="212">dbt</text>
+    <text class="sub" x="492" y="242">staging → marts</text>
+    <text class="sub" x="492" y="261">31 data tests</text>
+    <text class="sub" x="492" y="280">contracts as code</text>
+  </g>
+  <!-- 4 Serve -->
+  <g>
+    <rect class="card" x="688" y="150" width="176" height="150" rx="12"/>
+    <text class="stage" x="708" y="182">SERVE</text>
+    <text class="name" x="708" y="212">Scout Agent</text>
+    <text class="sub" x="708" y="242">Claude + run_sql</text>
+    <text class="sub" x="708" y="261">read-only, guarded</text>
+    <text class="sub" x="708" y="280">grounded, traced</text>
+  </g>
+  <!-- 5 Evaluate -->
+  <g>
+    <rect class="card" x="904" y="150" width="176" height="150" rx="12"/>
+    <text class="stage" x="924" y="182">EVALUATE</text>
+    <text class="name" x="924" y="212">Eval harness</text>
+    <text class="sub" x="924" y="242">20-Q golden set</text>
+    <text class="sub" x="924" y="261">100% correct</text>
+    <text class="sub" x="924" y="280">adversarial refusals</text>
+  </g>
+
+  <!-- flow arrows between cards -->
+  <line class="flow" x1="216" y1="225" x2="252" y2="225" marker-end="url(#arrow)"/>
+  <line class="flow" x1="432" y1="225" x2="468" y2="225" marker-end="url(#arrow)"/>
+  <line class="flow" x1="648" y1="225" x2="684" y2="225" marker-end="url(#arrow)"/>
+  <line class="flow" x1="864" y1="225" x2="900" y2="225" marker-end="url(#arrow)"/>
+
+  <!-- orchestration band -->
+  <line class="tick" x1="128" y1="300" x2="128" y2="392"/>
+  <line class="tick" x1="344" y1="300" x2="344" y2="392"/>
+  <line class="tick" x1="560" y1="300" x2="560" y2="392"/>
+  <line class="tick" x1="776" y1="300" x2="776" y2="392"/>
+  <line class="tick" x1="992" y1="300" x2="992" y2="392"/>
+  <rect class="band" x="40" y="392" width="1040" height="74" rx="12"/>
+  <text x="560" y="424" fill="#38bdf8" font-size="15" font-weight="700" text-anchor="middle" letter-spacing="1px">DAGSTER — ORCHESTRATED ASSET GRAPH</text>
+  <text x="560" y="447" fill="#93a4bf" font-size="12.5" text-anchor="middle">one lineage graph across Python + dbt + ML · retries · daily schedule (retires the launchd cron)</text>
+
+  <!-- CI band -->
+  <rect x="40" y="500" width="1040" height="62" rx="12" fill="#0e1a2c" stroke="#2b3b5c" stroke-width="1.5"/>
+  <text x="60" y="528" fill="#f8fafc" font-size="14" font-weight="700">CI / CD</text>
+  <text x="60" y="548" fill="#93a4bf" font-size="12.5">Docker · GitHub Actions — dbt tests gate data quality, the eval report gates agent quality (deterministic, no API key needed)</text>
+
+  <text x="1040" y="588" fill="#5b6b86" font-size="11" text-anchor="end">Python `gridiron` package owns ingestion · dbt owns transformation · Claude owns the natural-language layer</text>
+</svg>
