@@ -57,7 +57,7 @@ def _cached_download(url: str, dest: Path, ttl_hours: float, force: bool,
     log.info("Downloading %s", url)
     resp = requests.get(url, timeout=timeout)
     resp.raise_for_status()
-    dest.write_bytes(resp.content)
+    config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
     return dest
 
 

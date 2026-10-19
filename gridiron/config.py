@@ -10,6 +10,8 @@ is a *tunable* or a *segmentation marker* lives here; football reference data
 from __future__ import annotations
 
 import datetime as _dt
+import os
+from collections.abc import Callable
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
@@ -28,6 +30,24 @@ DB_URL: str = f"sqlite:///{DB_PATH}"
 
 for _d in (DATA_DIR, RAW_DIR, PROCESSED_DIR):
     _d.mkdir(parents=True, exist_ok=True)
+
+
+def atomic_write(dest: Path, write_fn: Callable[[Path], None]) -> Path:
+    """Write ``dest`` via a temp file + atomic rename, never overwriting in place.
+
+    Overwriting a file in place can hit a file-lock deadlock on a macOS Docker
+    bind mount (OSError [Errno 35] "Resource deadlock avoided") -- pandas/pyarrow
+    parquet and pathlib byte writes both trip it -- and the rename leaves no
+    half-written file behind if the process dies mid-write. ``write_fn`` receives
+    the temp path and writes the real content there.
+    """
+    dest = Path(dest)
+    tmp = dest.with_name(dest.name + ".tmp")
+    if tmp.exists():
+        tmp.unlink()
+    write_fn(tmp)
+    os.replace(tmp, dest)
+    return dest
 
 # --------------------------------------------------------------------------- #
 # Analysis window

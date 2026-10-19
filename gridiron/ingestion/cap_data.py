@@ -57,7 +57,7 @@ def download_contracts(force: bool = False, timeout: int = 60) -> Path:
             log.info("Downloading %s", url)
             resp = requests.get(url, timeout=timeout)
             resp.raise_for_status()
-            dest.write_bytes(resp.content)
+            config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
             log.info("Saved %.1f MB -> %s", len(resp.content) / 1e6, dest)
             return dest
         except requests.RequestException as exc:  # pragma: no cover - network

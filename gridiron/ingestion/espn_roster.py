@@ -122,7 +122,7 @@ def espn_to_gsis(*, ttl_hours: float = 24, force: bool = False) -> dict[str, str
     if stale or force:
         resp = requests.get(PLAYERS_URL, timeout=90)
         resp.raise_for_status()
-        dest.write_bytes(resp.content)
+        config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
     pl = pd.read_parquet(dest, columns=["espn_id", "gsis_id"]).dropna()
     pl["espn_id"] = pd.to_numeric(pl["espn_id"], errors="coerce").dropna().astype("int64").astype(str)
     return dict(zip(pl["espn_id"], pl["gsis_id"]))

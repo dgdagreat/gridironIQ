@@ -17,7 +17,6 @@ These are surfaced as ``None`` with a clear flag rather than faked from YAC.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import pandas as pd
 import requests
@@ -42,7 +41,7 @@ def load_pbp(season: int, force: bool = False, timeout: int = 120) -> pd.DataFra
         log.info("Downloading play-by-play: %s", url)
         resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
-        dest.write_bytes(resp.content)
+        config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
         log.info("Saved %.1f MB -> %s", len(resp.content) / 1e6, dest)
     return pd.read_parquet(dest)
 

@@ -86,7 +86,10 @@ def run_etl(force_download: bool = False, save_processed: bool = True) -> dict:
 
 def _save_processed(player_year, spending, features) -> None:
     """Write flat extracts for the modeling layer / quick inspection."""
-    player_year.to_parquet(config.PROCESSED_DIR / "player_year_caps.parquet")
-    spending.to_csv(config.PROCESSED_DIR / "positional_spending.csv", index=False)
-    features.to_csv(config.PROCESSED_DIR / "spending_features.csv", index=False)
+    config.atomic_write(config.PROCESSED_DIR / "player_year_caps.parquet",
+                        player_year.to_parquet)
+    config.atomic_write(config.PROCESSED_DIR / "positional_spending.csv",
+                        lambda p: spending.to_csv(p, index=False))
+    config.atomic_write(config.PROCESSED_DIR / "spending_features.csv",
+                        lambda p: features.to_csv(p, index=False))
     log.info("Wrote processed extracts to %s", config.PROCESSED_DIR)

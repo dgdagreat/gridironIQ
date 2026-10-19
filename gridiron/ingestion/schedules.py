@@ -41,7 +41,7 @@ def load_schedules(*, force: bool = False, ttl_hours: float = DEFAULT_TTL_HOURS,
         log.info("Downloading schedules: %s", SCHEDULE_URL)
         resp = requests.get(SCHEDULE_URL, timeout=timeout)
         resp.raise_for_status()
-        dest.write_bytes(resp.content)
+        config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
     df = pd.read_csv(dest, low_memory=False)
     df["status"] = df["result"].notna().map({True: "played", False: "scheduled"})
     return df
