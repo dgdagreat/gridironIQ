@@ -76,15 +76,15 @@ ingestion ─┤
 | **AI agent** | Anthropic API | NL scouting agent, read-only guarded SQL, hand-written tool-use loop | ✅ live |
 | **Evals** | custom harness | 20-item golden set; CI gate rescores offline — no warehouse, no API key | ✅ 95–100% |
 | **Packaging** | Docker · GitHub Actions | Reproducible image; CI = ruff + pytest + eval gate + dbt parse | ✅ green in-container |
-| **Viz** | Tableau Public | Champion-premium + cap-efficiency dashboard | 📋 [data + guide](tableau/) ready to publish |
+| **Viz** | Tableau Public | Champion-premium + cap-efficiency dashboard | ✅ **[live dashboard](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)** |
 
 **What this demonstrates**
 - **Dev→prod portability** — dbt develops on free/fast DuckDB and deploys *unchanged* to Databricks Delta; the champion-premium finding reproduces identically on both.
 - **Right tool for the data** — Spark is reserved for the one genuinely large dataset (play-by-play); the small cap data stays in dbt/DuckDB.
 - **Validating the validator** — the eval harness first scored 70%, but every miss was a *scorer* bug (Unicode-minus read as positive, "49ers" parsed as 49). Fixing the **scorer**, not the agent, took it to 95–100%; the gate then runs fully offline in CI.
 
-📐 Full write-up: **[ARCHITECTURE.md](ARCHITECTURE.md)**  ·  Databricks runbook: **[DATABRICKS.md](DATABRICKS.md)**  ·  dashboard: **[tableau/](tableau/)**
-🔗 *Live Tableau dashboard:* _publish via [tableau/BUILD_GUIDE.md](tableau/BUILD_GUIDE.md), then drop the public URL here_
+📐 Full write-up: **[ARCHITECTURE.md](ARCHITECTURE.md)**  ·  Databricks runbook: **[DATABRICKS.md](DATABRICKS.md)**  ·  dashboard build: **[tableau/](tableau/)**
+🔗 **Live Tableau dashboard → [public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)**
 
 ---
 
@@ -348,7 +348,7 @@ so it never offers a player who's already signed.
 | **Platform — AI scouting agent (guarded read-only SQL)** | ✅ live |
 | **Platform — eval harness + offline CI gate** | ✅ 95–100% (no warehouse / API key needed) |
 | **Platform — Docker image + GitHub Actions CI** | ✅ builds + runs green in-container |
-| **Platform — Tableau Public dashboard** | 📋 data + guide ready ([tableau/](tableau/)) |
+| **Platform — Tableau Public dashboard** | ✅ **[live](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)** |
 | Streamlit app (3 tabs) | ✅ Boardroom + Maxer live; Film Room wired |
 | Charting metrics (separation, YACO) | 🟡 scaffolded (NGS/PFR pass) |
 | React frontend | 📋 planned ([frontend/README.md](frontend/README.md)) |
