@@ -48,6 +48,46 @@ with **TE and WR cap share** the most important features by permutation importan
 
 ---
 
+## Data & AI engineering platform
+
+The analytics above run on a production-style **data + AI engineering** backbone —
+built locally-green first, then deployed to the cloud. The Python `gridiron`
+package owns **ingestion** (every OverTheCap / nflverse / Madden trap); everything
+downstream is a proper, tested, orchestrated pipeline.
+
+```
+          ┌─ dbt marts  (DuckDB dev ──flip profiles──► Databricks Delta prod)
+ingestion ─┤
+(gridiron) └─ PySpark + Delta medallion  (play-by-play → Bronze→Silver→Gold → team EPA)
+                      │
+                      ▼
+        Dagster asset graph  ──orchestrates──►  scikit-learn Super Bowl model
+                      │
+        AI scouting agent (guarded read-only SQL)  +  offline deterministic eval gate
+                      │
+        Docker image  ·  GitHub Actions CI  ·  Tableau Public dashboard
+```
+
+| Layer | Tech | What it does | Status |
+|---|---|---|---|
+| **Warehouse** | dbt (DuckDB → Databricks) | 9 models, 31 tests; champion-premium marts. Same SQL, flip `profiles.yml`. | ✅ **live on Databricks** (PASS=40) |
+| **Lakehouse** | PySpark + Delta Lake | Play-by-play medallion (Bronze→Silver→Gold), ~1.2M plays → team EPA | ✅ **serverless Databricks Job**, daily |
+| **Orchestration** | Dagster | One asset graph: ingestion → dbt → ML model → medallion, scheduled | ✅ materializes green |
+| **AI agent** | Anthropic API | NL scouting agent, read-only guarded SQL, hand-written tool-use loop | ✅ live |
+| **Evals** | custom harness | 20-item golden set; CI gate rescores offline — no warehouse, no API key | ✅ 95–100% |
+| **Packaging** | Docker · GitHub Actions | Reproducible image; CI = ruff + pytest + eval gate + dbt parse | ✅ green in-container |
+| **Viz** | Tableau Public | Champion-premium + cap-efficiency dashboard | 📋 [data + guide](tableau/) ready to publish |
+
+**What this demonstrates**
+- **Dev→prod portability** — dbt develops on free/fast DuckDB and deploys *unchanged* to Databricks Delta; the champion-premium finding reproduces identically on both.
+- **Right tool for the data** — Spark is reserved for the one genuinely large dataset (play-by-play); the small cap data stays in dbt/DuckDB.
+- **Validating the validator** — the eval harness first scored 70%, but every miss was a *scorer* bug (Unicode-minus read as positive, "49ers" parsed as 49). Fixing the **scorer**, not the agent, took it to 95–100%; the gate then runs fully offline in CI.
+
+📐 Full write-up: **[ARCHITECTURE.md](ARCHITECTURE.md)**  ·  Databricks runbook: **[DATABRICKS.md](DATABRICKS.md)**  ·  dashboard: **[tableau/](tableau/)**
+🔗 *Live Tableau dashboard:* _publish via [tableau/BUILD_GUIDE.md](tableau/BUILD_GUIDE.md), then drop the public URL here_
+
+---
+
 ## Architecture
 
 Clean separation between **ingestion**, **modeling**, and **frontend**, with a
@@ -71,10 +111,12 @@ gridironIQ/
 │   │   ├── roster_strength.py # per-team per-position strength rankings (Maxer)
 │   │   ├── sb_maxer.py        # champion blueprint + gap/readiness/needs (Maxer)
 │   │   └── free_agents.py     # best available FAs to fill each team's needs (Maxer)
-│   └── filmroom/
-│       ├── pbp_metrics.py     # play-by-play → metrics, attribution, team form
-│       ├── matchup.py         # pre-game preview payloads (form + roster edges)
-│       └── breakdown.py       # claude-sonnet-4-6 report (pre & post, adaptive thinking)
+│   ├── filmroom/
+│   │   ├── pbp_metrics.py     # play-by-play → metrics, attribution, team form
+│   │   ├── matchup.py         # pre-game preview payloads (form + roster edges)
+│   │   └── breakdown.py       # claude-sonnet-4-6 report (pre & post, adaptive thinking)
+│   ├── agent/                 # NL scouting agent (guarded read-only SQL + tool-use loop)
+│   └── evals/                 # deterministic eval harness + 20-item golden set
 ├── sql/
 │   ├── 01_schema.sql          # canonical data model (tables)
 │   └── 02_views.sql           # analytical views + indexes
@@ -84,9 +126,19 @@ gridironIQ/
 ├── app/streamlit_app.py       # working frontend (Boardroom + Film Room + Maxer tabs)
 ├── frontend/                  # planned React build (see frontend/README.md)
 ├── data/                      # raw + processed artifacts, SQLite db (git-ignored)
-└── notebooks/                 # exploratory analysis (imports from gridiron/)
-    ├── 01_cap_eda.ipynb       # data-quality discovery: the >400% double-count, sparse pre-2011
-    └── 02_model_results.ipynb # findings: champion premium, archetypes, ROC, feature importance
+├── notebooks/                 # exploratory analysis (imports from gridiron/)
+│   ├── 01_cap_eda.ipynb       # data-quality discovery: the >400% double-count, sparse pre-2011
+│   └── 02_model_results.ipynb # findings: champion premium, archetypes, ROC, feature importance
+│
+│                              # ─────────── data + AI engineering platform ───────────
+├── warehouse/                 # dbt project: staging + marts (DuckDB dev → Databricks prod)
+├── lakehouse/                 # PySpark + Delta medallion (play-by-play) + Databricks Job
+├── orchestration/             # Dagster asset graph (ingestion → dbt → model → medallion)
+├── tableau/                   # dashboard data export + build/publish guide
+├── tests/                     # pytest: SQL guard + eval scorer (run in CI)
+├── Dockerfile, docker-compose.yml     # containerized platform
+├── .github/workflows/         # CI (ruff + pytest + eval gate + dbt parse) + daily refresh
+└── ARCHITECTURE.md, DATABRICKS.md     # platform write-up + Databricks runbook
 ```
 
 ---
@@ -290,6 +342,13 @@ so it never offers a player who's already signed.
 | Maxer: free-agent needs recommender | ✅ live (re-derives FA pool each refresh) |
 | Maxer: ESPN cross-check + roster auto-fill | ✅ live (89 ESPN-only players filled) |
 | Data refresh (daily, GitHub Actions) | ✅ scheduled + manual dispatch |
+| **Platform — dbt warehouse (marts + 31 tests)** | ✅ live: DuckDB dev + **Databricks Delta prod** (PASS=40) |
+| **Platform — PySpark + Delta medallion (play-by-play)** | ✅ **serverless Databricks Job**, daily |
+| **Platform — Dagster orchestration (one asset graph)** | ✅ materializes green (local + Docker) |
+| **Platform — AI scouting agent (guarded read-only SQL)** | ✅ live |
+| **Platform — eval harness + offline CI gate** | ✅ 95–100% (no warehouse / API key needed) |
+| **Platform — Docker image + GitHub Actions CI** | ✅ builds + runs green in-container |
+| **Platform — Tableau Public dashboard** | 📋 data + guide ready ([tableau/](tableau/)) |
 | Streamlit app (3 tabs) | ✅ Boardroom + Maxer live; Film Room wired |
 | Charting metrics (separation, YACO) | 🟡 scaffolded (NGS/PFR pass) |
 | React frontend | 📋 planned ([frontend/README.md](frontend/README.md)) |
@@ -298,6 +357,8 @@ so it never offers a player who's already signed.
 
 ## Tech stack
 
-Python · pandas · scikit-learn · matplotlib/seaborn · SQLite (SQLAlchemy) ·
-Streamlit · Anthropic API (`claude-sonnet-4-6`) · GitHub Actions (daily refresh) ·
-data: nflverse/OverTheCap · nflfastR · [nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data).
+**Analytics & app:** Python · pandas · scikit-learn · matplotlib/seaborn · SQLite (SQLAlchemy) · Streamlit · Anthropic API (`claude-sonnet-4-6`)
+
+**Data & AI engineering platform:** dbt (DuckDB → Databricks) · PySpark + Delta Lake · Databricks (Unity Catalog, serverless Jobs, Asset Bundles) · Dagster · Docker · GitHub Actions (CI + daily refresh) · Tableau Public
+
+**Data:** nflverse / OverTheCap · nflfastR play-by-play · [nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data).
