@@ -8,6 +8,14 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/app/data          # mount your local SQLite/DuckDB/parquet
+      # Live-reload the source: edit on the host, hit "Reload definitions" in the
+      # UI — no image rebuild. warehouse/ is intentionally NOT mounted so the
+      # image's baked dbt_packages/ stays (host warehouse/ has none — it's
+      # gitignored). To iterate on dbt models too: run `cd warehouse &&
+      # ../.venv/bin/dbt deps` on the host once, then add `- ./warehouse:/app/warehouse`.
+      - ./gridiron:/app/gridiron
+      - ./orchestration:/app/orchestration
+      - ./scripts:/app/scripts
     env_file:
       - .env                      # ANTHROPIC_API_KEY for the scouting agent
     environment:
