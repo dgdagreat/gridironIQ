@@ -20,4 +20,5 @@ anthropic>=0.40
 python-dotenv>=1.0
 
 # app
-streamlit>=1.30
+streamlit>=1.35
+plotly>=5.20            # interactive football-field view (Maxer tab)
