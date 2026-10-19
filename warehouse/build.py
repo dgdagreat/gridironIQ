@@ -34,7 +34,10 @@ def main(argv: list[str]) -> int:
 
     # 1. ingestion -> warehouse
     run([py, str(HERE / "load_raw.py")], cwd=REPO)
-    # 2. transform + test
+    # 2. install dbt package deps (dbt_utils). dbt_packages/ is gitignored, so a
+    #    fresh checkout / container has none — deps must run before build.
+    run([dbt, "deps"], cwd=HERE)
+    # 3. transform + test
     run([dbt, "build", "--profiles-dir", ".", "--target", target], cwd=HERE)
     print("\nwarehouse build OK")
     return 0
