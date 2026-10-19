@@ -1,0 +1,661 @@
+player,team,pos_group,position,age,grade,caliber_pct,pay_pct,apy,value_index
+Puka Nacua,LAR,WR,Wide Receiver,25.3,A,86,2,1.0,84
+Kobie Turner,LAR,IDL,Interior D-Line,27.4,B,81,4,1.3,78
+Bucky Irving,TB,RB,Running Back,24.0,B,84,7,1.2,77
+L'Jarius Sneed,KC,CB,Cornerback,29.6,B,75,7,1.2,69
+Daiyan Henley,LAC,LB,Linebacker,26.8,B,77,8,1.4,69
+David Njoku,LAC,TE,Tight End,30.1,B,83,18,3.0,65
+Scott Matlock,LAC,RB,Running Back,26.2,C,66,2,1.0,64
+Dominick Puni,SF,OL,Offensive Line,26.5,C,65,2,1.4,63
+Zach Frazier,PIT,OL,Offensive Line,25.0,C,68,6,1.9,62
+Brian Branch,DET,S,Safety,24.9,A,92,31,2.0,61
+Jalen Carter,PHI,IDL,Interior D-Line,25.4,A,89,29,5.5,61
+Sam LaPorta,DET,TE,Tight End,25.6,B,73,13,2.4,60
+Braden Fiske,LAR,EDGE,Edge Rusher,26.6,B,73,13,2.4,60
+Bradley Pinion,MIA,SPEC,Special Teams,32.3,B,83,26,1.5,58
+Rasul Douglas,WAS,CB,Cornerback,30.0,B,75,19,1.6,57
+Drue Tranquill,KC,EDGE,Edge Rusher,31.0,B,80,23,3.5,57
+Brock Bowers,LV,TE,Tight End,23.7,A,87,30,4.5,57
+Bryce Baringer,NE,SPEC,Special Teams,27.4,C,62,7,1.0,56
+Christian Gonzalez,NE,CB,Cornerback,24.2,A,100,44,3.8,56
+Tarheeb Still,LAC,CB,Cornerback,24.2,C,56,4,1.1,52
+Jared Verse,CLE,EDGE,Edge Rusher,25.8,B,77,26,3.8,51
+Cam Taylor-Britt,IND,CB,Cornerback,26.9,C,62,12,1.4,50
+Chase Brown,CIN,RB,Running Back,26.4,C,54,4,1.0,50
+Dre Greenlaw,SF,LB,Linebacker,29.3,A,89,41,6.0,49
+Andrew DePaola,MIN,SPEC,Special Teams,39.1,B,83,36,1.7,48
+Darren Waller,CAR,TE,Tight End,33.0,C,58,10,2.0,48
+Kyle Dugger,CIN,S,Safety,30.4,C,58,10,1.4,47
+Corey Bojorquez,CLE,SPEC,Special Teams,30.0,A,90,44,2.0,46
+Jahmyr Gibbs,DET,RB,Running Back,24.5,A,96,51,4.5,46
+Josh Harris,LAC,SPEC,Special Teams,37.3,B,83,38,1.8,46
+Yaya Diaby,TB,EDGE,Edge Rusher,27.3,C,51,5,1.4,46
+Dante Fowler Jr.,SEA,EDGE,Edge Rusher,32.1,C,60,15,2.5,45
+Bud Dupree,LAC,EDGE,Edge Rusher,33.5,B,73,28,4.0,45
+Brian Thomas Jr.,JAX,WR,Wide Receiver,23.9,B,82,38,3.7,45
+DJ Reader,NYG,IDL,Interior D-Line,32.2,B,81,38,6.2,44
+Mario Edwards Jr.,HOU,IDL,Interior D-Line,32.0,C,68,25,4.8,43
+Garrett Williams,ARI,CB,Cornerback,25.3,C,56,14,1.4,43
+Ladd McConkey,LAC,WR,Wide Receiver,24.8,C,65,23,2.5,42
+Trent Brown,HOU,OL,Offensive Line,33.4,B,71,29,5.5,42
+Tua Tagovailoa,ATL,QB,Quarterback,28.5,C,46,4,1.2,42
+Cody Mauch,TB,OL,Offensive Line,27.6,C,46,5,1.9,41
+Gervon Dexter Sr.,CHI,IDL,Interior D-Line,25.9,C,48,7,1.7,41
+Rashee Rice,KC,WR,Wide Receiver,26.4,C,59,18,1.6,41
+Tank Dell,HOU,WR,Wide Receiver,26.8,C,54,13,1.4,40
+Cooper DeJean,PHI,CB,Cornerback,23.6,B,71,31,2.3,40
+Joe Tippmann,NYJ,OL,Offensive Line,25.4,C,46,7,2.1,39
+T'Vondre Sweat,NYJ,IDL,Interior D-Line,25.1,C,48,11,2.4,38
+Jadeveon Clowney,HOU,EDGE,Edge Rusher,33.0,C,60,23,3.5,37
+Hogan Hatten,DET,SPEC,Special Teams,26.1,D,39,2,0.9,37
+Quinyon Mitchell,PHI,CB,Cornerback,25.1,B,80,43,3.7,37
+Bijan Robinson,ATL,RB,Running Back,24.6,A,93,56,5.5,37
+Trenton Simpson,BAL,LB,Linebacker,25.2,D,41,5,1.4,35
+Leo Chenal,WAS,EDGE,Edge Rusher,25.8,B,80,45,8.2,35
+Marcus Davenport,CHI,EDGE,Edge Rusher,29.0,C,51,15,2.5,35
+Calais Campbell,BAL,IDL,Interior D-Line,40.0,C,68,33,5.5,35
+Jayden Daniels,WAS,QB,Quarterback,25.7,C,65,29,9.4,35
+Lamar Jackson,BAL,QB,Quarterback,29.6,A,98,62,52.0,35
+Zay Flowers,BAL,WR,Wide Receiver,26.0,B,71,35,3.5,35
+Mike Evans,SF,WR,Wide Receiver,33.0,A,93,59,14.2,35
+C.J. Gardner-Johnson,BUF,CB,Cornerback,28.7,B,75,40,3.5,35
+Martin Emerson,NO,CB,Cornerback,25.9,C,50,16,1.5,34
+Malik Nabers,NYG,WR,Wide Receiver,23.1,B,82,49,7.3,34
+Chris Olave,NO,WR,Wide Receiver,26.2,B,77,43,4.8,34
+Jordan Addison,MIN,WR,Wide Receiver,24.6,C,65,32,3.4,34
+Quincy Williams,CLE,EDGE,Edge Rusher,30.0,B,73,40,6.5,33
+Erik McCoy,NO,OL,Offensive Line,29.0,B,84,51,12.0,33
+Teven Jenkins,CLE,OL,Offensive Line,28.5,C,52,19,4.0,33
+Kamren Kinchens,LAR,S,Safety,23.9,D,40,7,1.4,33
+Dallas Goedert,PHI,TE,Tight End,31.7,B,77,43,7.0,33
+Kamari Lassiter,HOU,CB,Cornerback,23.6,C,62,28,2.3,33
+Josh Downs,IND,WR,Wide Receiver,25.1,D,41,9,1.4,33
+Rasheed Walker,CAR,OL,Offensive Line,26.5,C,52,19,4.0,33
+Patrick Mahomes,KC,QB,Quarterback,31.0,A,88,54,45.0,33
+DJ Turner II,CIN,CB,Cornerback,25.8,C,50,17,1.5,33
+James Conner,ARI,RB,Running Back,31.3,B,77,45,3.0,32
+Edgerrin Cooper,GB,LB,Linebacker,24.8,C,49,16,2.1,32
+Tucker Kraft,GB,TE,Tight End,25.8,D,38,7,1.4,32
+Marvin Mims Jr.,DEN,WR,Wide Receiver,24.5,C,48,17,1.5,31
+Isiah Pacheco,DET,RB,Running Back,27.5,C,66,35,1.8,31
+Zach Wood,NO,SPEC,Special Teams,33.6,C,62,31,1.6,31
+Jaquan Brisker,PIT,S,Safety,27.4,B,78,47,5.5,31
+Anfernee Jennings,NO,EDGE,Edge Rusher,29.3,D,38,8,1.4,31
+Jarvis Brownlee Jr.,NYJ,CB,Cornerback,25.1,D,32,2,1.1,30
+Roger McCreary,DET,CB,Cornerback,26.6,D,41,12,1.4,30
+DeMario Douglas,NE,WR,Wide Receiver,25.7,D,31,1,1.0,30
+Geno Stone,BUF,S,Safety,27.4,D,40,10,1.4,30
+Tyrone Tracy Jr.,NYG,RB,Running Back,26.8,D,34,5,1.1,29
+Luke Rhodes,IND,SPEC,Special Teams,33.7,C,62,33,1.6,29
+Devon Witherspoon,SEA,CB,Cornerback,25.7,A,88,59,8.0,29
+Tuli Tuipulotu,LAC,EDGE,Edge Rusher,24.0,D,38,9,1.6,29
+Blake Cashman,MIN,LB,Linebacker,30.3,B,77,49,7.5,28
+Jonathan Allen,CIN,IDL,Interior D-Line,31.6,A,87,59,12.5,28
+Keion White,SF,EDGE,Edge Rusher,27.6,D,38,11,1.9,28
+Demario Davis,NYJ,LB,Linebacker,37.6,A,95,68,11.0,27
+Travis Kelce,KC,TE,Tight End,36.9,A,97,70,12.0,27
+Quinn Meinerz,DEN,OL,Offensive Line,27.8,A,95,68,18.0,27
+Ahkello Witherspoon,WAS,CB,Cornerback,31.4,D,41,15,1.4,27
+Bryan Anger,DAL,SPEC,Special Teams,37.9,B,83,58,3.2,26
+Joe Thuney,CHI,OL,Offensive Line,33.8,A,91,65,17.5,26
+Calvin Austin III,NYG,WR,Wide Receiver,27.4,D,41,16,1.5,26
+Elgton Jenkins,CLE,OL,Offensive Line,30.7,B,77,51,12.0,26
+Noah Fant,NO,TE,Tight End,28.8,C,52,27,4.4,25
+Justin Reid,NO,S,Safety,29.5,A,88,63,10.5,25
+Rayshawn Jenkins,PIT,S,Safety,32.0,D,40,15,1.4,25
+Geno Smith,NYJ,QB,Quarterback,35.9,D,38,12,3.3,25
+Creed Humphrey,KC,OL,Offensive Line,27.2,A,93,68,18.0,25
+Tyjae Spears,TEN,RB,Running Back,25.2,D,42,18,1.4,25
+Jackson Powers-Johnson,LV,OL,Offensive Line,23.6,D,31,8,2.2,24
+Brandon Jones,DEN,S,Safety,28.4,B,78,54,6.7,24
+Dameon Pierce,PHI,RB,Running Back,26.5,D,34,11,1.3,24
+Darnell Wright,CHI,OL,Offensive Line,25.1,C,52,28,5.2,24
+Ji'Ayir Brown,SF,S,Safety,26.6,D,29,5,1.3,24
+Michael Wilson,ARI,WR,Wide Receiver,26.5,D,31,7,1.3,24
+Davon Godchaux,NO,IDL,Interior D-Line,31.8,C,57,33,5.5,24
+J.J. Jansen,CAR,SPEC,Special Teams,40.6,C,49,26,1.5,23
+Cameron Heyward,PIT,IDL,Interior D-Line,37.3,A,98,75,18.0,23
+Logan Cooke,JAX,SPEC,Special Teams,31.1,A,94,71,4.0,23
+Joey Porter Jr.,PIT,CB,Cornerback,26.1,C,56,33,2.4,23
+Kyler Murray,MIN,QB,Quarterback,29.1,D,31,8,1.3,23
+Rakeem Nunez-Roches,TB,IDL,Interior D-Line,33.2,D,25,2,1.3,23
+Vita Vea,TB,IDL,Interior D-Line,31.6,A,96,73,17.8,22
+Ethan Evans,LAR,SPEC,Special Teams,25.1,D,27,4,1.0,22
+Kevin Byard,NE,S,Safety,33.0,B,78,56,7.0,22
+Cole Holcomb,PIT,LB,Linebacker,30.1,D,41,19,2.5,22
+J.K. Scott,LAC,SPEC,Special Teams,30.8,B,76,53,3.0,22
+Nate Hobbs,SF,CB,Cornerback,27.2,C,62,40,3.5,22
+Christian Kirk,SF,WR,Wide Receiver,29.8,C,48,27,3.0,21
+Julian Love,SEA,S,Safety,28.5,A,86,65,11.0,21
+Darnell Mooney,NYG,WR,Wide Receiver,28.8,C,48,27,3.0,21
+Braden Smith,HOU,OL,Offensive Line,30.4,C,65,44,10.0,21
+Hjalte Froholdt,ARI,OL,Offensive Line,30.0,C,52,31,6.0,21
+Michael Dickson,SEA,SPEC,Special Teams,30.7,A,94,73,4.0,21
+C.J. Stroud,HOU,QB,Quarterback,24.9,D,42,21,9.1,21
+Julian Blackmon,NO,S,Safety,28.0,C,58,37,2.5,20
+T.J. Hockenson,MIN,TE,Tight End,29.2,B,80,60,10.2,20
+Chidobe Awuzie,BAL,CB,Cornerback,31.3,B,71,51,5.0,20
+Elijah Moore,PHI,WR,Wide Receiver,26.4,D,26,6,1.3,20
+Grover Stewart,IND,IDL,Interior D-Line,32.9,B,81,62,13.0,20
+Taliese Fuaga,NO,OL,Offensive Line,24.4,D,40,20,4.3,20
+Brian Robinson,ATL,RB,Running Back,27.4,C,60,40,2.5,19
+DeShon Elliott,PIT,S,Safety,29.4,C,69,50,6.2,19
+Aaron Jones,MIN,RB,Running Back,31.7,B,77,58,5.6,19
+Baker Mayfield,TB,QB,Quarterback,31.4,C,65,46,33.3,19
+Ikem Ekwonu,CAR,OL,Offensive Line,25.8,C,52,33,6.9,19
+Minkah Fitzpatrick,NYJ,S,Safety,29.8,A,97,79,13.3,19
+Joe Alt,LAC,OL,Offensive Line,23.5,C,60,41,8.3,19
+Chamarri Conner,KC,S,Safety,26.1,F,20,2,1.1,19
+Jeremy Chinn,LV,S,Safety,28.5,B,78,59,8.1,19
+Cam Little,JAX,SPEC,Special Teams,23.0,D,27,9,1.0,18
+Davante Adams,LAR,WR,Wide Receiver,33.7,A,90,73,22.0,18
+T.J. Edwards,CHI,EDGE,Edge Rusher,30.1,C,67,49,10.0,18
+Joe Tryon-Shoyinka,PHI,EDGE,Edge Rusher,27.3,D,26,8,1.4,18
+Jordan Battle,CIN,S,Safety,25.7,F,20,3,1.3,17
+Ar'Darius Washington,NYG,S,Safety,26.8,C,58,41,3.0,17
+Morgan Moses,NE,OL,Offensive Line,35.5,C,56,39,8.0,17
+Cooper Kupp,SEA,WR,Wide Receiver,33.2,B,77,60,15.0,17
+Nolan Smith,PHI,EDGE,Edge Rusher,25.6,D,38,21,3.0,17
+Mike Onwenu,NE,OL,Offensive Line,28.7,C,60,44,10.0,16
+Tony Jefferson,LAC,S,Safety,34.6,D,40,24,1.5,16
+Derrick Brown,CAR,EDGE,Edge Rusher,28.4,A,96,79,24.0,16
+Greg Rousseau,BUF,EDGE,Edge Rusher,26.4,A,88,72,20.0,16
+Omar Speights,LAR,LB,Linebacker,25.5,F,19,3,0.9,16
+John Simpson,BAL,OL,Offensive Line,29.0,C,60,44,10.0,16
+Brandon Coleman,WAS,OL,Offensive Line,25.9,F,19,4,1.5,15
+Stefon Diggs,WAS,WR,Wide Receiver,32.0,A,86,71,21.2,15
+Troy Fautanu,PIT,OL,Offensive Line,25.9,D,31,16,3.8,15
+Khalil Mack,LAC,EDGE,Edge Rusher,35.5,B,85,69,18.0,15
+Tony Pollard,TEN,RB,Running Back,29.3,B,82,67,7.2,15
+Bo Nix,DEN,QB,Quarterback,26.5,D,31,17,4.7,15
+Jalen Hurts,PHI,QB,Quarterback,28.1,B,73,58,51.0,15
+Riley Moss,DEN,CB,Cornerback,26.5,F,25,10,1.4,15
+Jonathan Jones,PHI,CB,Cornerback,32.9,D,41,26,2.0,15
+Xavier Woods,CHI,S,Safety,31.0,C,58,42,4.0,15
+Ted Karras,CIN,OL,Offensive Line,33.5,D,40,25,5.0,14
+Marvin Harrison Jr.,ARI,WR,Wide Receiver,24.1,C,65,51,8.8,14
+Jordan Mailata,PHI,OL,Offensive Line,29.4,A,97,83,22.0,14
+Sean Murphy-Bunting,ARI,CB,Cornerback,29.2,C,50,36,3.0,14
+Quenton Nelson,IND,OL,Offensive Line,30.5,A,89,75,20.0,14
+Braxton Jones,CHI,OL,Offensive Line,27.4,D,40,25,5.0,14
+Tommy Townsend,TEN,SPEC,Special Teams,29.8,C,62,48,2.5,14
+Cameron Jordan,NO,EDGE,Edge Rusher,37.0,C,51,36,6.0,14
+Chris Lindstrom,ATL,OL,Offensive Line,29.5,A,93,79,20.5,14
+Jason Sanders,NYJ,SPEC,Special Teams,30.8,D,39,26,1.5,13
+Nate Wiggins,BAL,CB,Cornerback,23.0,C,50,37,3.2,13
+Jamel Dean,PIT,CB,Cornerback,29.9,B,83,70,12.2,13
+DeMarvion Overshown,DAL,EDGE,Edge Rusher,26.1,F,16,4,1.3,12
+Abdul Carter,NYG,EDGE,Edge Rusher,22.9,C,67,55,11.3,12
+Renardo Green,SF,CB,Cornerback,25.8,D,32,20,1.6,12
+Jake Bates,DET,SPEC,Special Teams,27.5,D,27,14,1.1,12
+AJ Dillon,CAR,RB,Running Back,28.3,D,34,22,1.4,12
+Tyler Biadasz,LAC,OL,Offensive Line,28.8,C,56,44,10.0,12
+Hunter Henry,NE,TE,Tight End,31.7,C,63,52,9.0,12
+Matthew Bergeron,ATL,OL,Offensive Line,26.5,F,19,9,2.2,11
+Ronnie Stanley,BAL,OL,Offensive Line,32.5,A,86,75,20.0,11
+Dion Dawkins,BUF,OL,Offensive Line,32.4,A,88,77,20.0,11
+Poona Ford,LAR,IDL,Interior D-Line,30.8,C,57,46,9.2,11
+DeVonta Smith,PHI,WR,Wide Receiver,27.8,A,88,78,25.0,10
+Harold Landry III,NE,EDGE,Edge Rusher,30.2,B,73,63,14.5,10
+Josh Allen,BUF,QB,Quarterback,30.3,A,98,88,55.0,10
+Byron Young,LAR,EDGE,Edge Rusher,28.5,F,16,6,1.4,10
+Jaylon Jones,IND,CB,Cornerback,24.4,F,11,1,1.0,10
+Jonathan Owens,IND,S,Safety,31.1,F,20,10,1.4,10
+Xavier McKinney,GB,S,Safety,27.1,A,100,90,16.8,10
+Taron Johnson,LV,CB,Cornerback,30.1,B,75,65,10.2,10
+Steve Avila,LAR,OL,Offensive Line,26.9,F,19,10,2.3,10
+Alijah Vera-Tucker,NE,OL,Offensive Line,27.2,C,68,58,14.0,10
+Kevin Dotson,LAR,OL,Offensive Line,30.0,B,71,62,16.0,9
+Xavier Worthy,KC,WR,Wide Receiver,23.3,D,41,33,3.4,9
+Damien Lewis,CAR,OL,Offensive Line,29.4,C,65,56,13.2,9
+Zaven Collins,ARI,EDGE,Edge Rusher,27.3,C,51,41,7.0,9
+Leonard Williams,SEA,EDGE,Edge Rusher,32.2,B,85,75,21.5,9
+Tank Bigsby,PHI,RB,Running Back,24.0,F,25,16,1.3,9
+Evan Brown,HOU,OL,Offensive Line,30.0,F,19,11,2.5,9
+Talanoa Hufanga,DEN,S,Safety,26.6,B,85,75,13.0,9
+Tim Patrick,NYJ,WR,Wide Receiver,32.8,D,31,22,2.0,9
+Shelby Harris,NYG,IDL,Interior D-Line,35.1,D,25,16,3.0,9
+Frankie Luvu,WAS,EDGE,Edge Rusher,29.9,C,60,51,10.3,9
+Terry McLaurin,WAS,WR,Wide Receiver,31.0,A,95,87,29.0,9
+Payton Wilson,PIT,LB,Linebacker,26.4,F,19,11,1.4,8
+Rashan Gary,DAL,EDGE,Edge Rusher,28.7,B,73,65,16.0,8
+Lane Johnson,PHI,OL,Offensive Line,36.3,A,100,92,25.0,8
+Kenneth Grant,MIA,IDL,Interior D-Line,22.8,D,38,30,5.5,8
+Chuck Clark,DET,S,Safety,31.4,D,29,20,1.5,8
+JC Latham,TEN,OL,Offensive Line,23.6,D,40,32,6.5,8
+Tyler Higbee,LAR,TE,Tight End,33.7,D,27,18,3.0,8
+DeMarcus Lawrence,SEA,EDGE,Edge Rusher,34.3,C,60,52,10.8,8
+Kayvon Thibodeaux,NYG,EDGE,Edge Rusher,25.7,C,51,42,7.8,8
+Greg Van Roten,NE,OL,Offensive Line,36.0,F,19,12,3.2,8
+Trent Williams,SF,OL,Offensive Line,38.1,A,99,92,25.0,7
+Josh Palmer,BUF,WR,Wide Receiver,26.9,C,59,52,10.0,7
+AJ Cole,LV,SPEC,Special Teams,30.8,B,76,69,4.0,7
+James Cook,BUF,RB,Running Back,26.9,A,89,82,11.5,7
+Trey Hendrickson,BAL,EDGE,Edge Rusher,31.7,A,93,86,28.0,7
+Amon-Ra St. Brown,DET,WR,Wide Receiver,26.9,A,98,90,30.0,7
+Najee Harris,NYG,RB,Running Back,28.0,C,60,53,5.2,7
+Mike Sainristil,WAS,CB,Cornerback,25.9,D,32,25,1.9,7
+Andrew Van Ginkel,MIN,EDGE,Edge Rusher,31.2,B,85,78,23.0,7
+Malcolm Rodriguez,DET,EDGE,Edge Rusher,27.4,D,26,19,2.8,7
+Wyatt Teller,HOU,OL,Offensive Line,31.8,C,46,39,8.0,7
+Jarran Reed,SEA,IDL,Interior D-Line,33.7,C,48,41,7.3,7
+Jalen Tolbert,MIA,WR,Wide Receiver,27.5,F,18,11,1.4,7
+Marlon Humphrey,BAL,CB,Cornerback,30.1,A,95,88,19.5,7
+Sam Cosmi,WAS,OL,Offensive Line,27.5,B,77,71,18.5,7
+Javon Hargrave,GB,IDL,Interior D-Line,33.6,C,63,57,11.5,6
+Myles Garrett,LAR,EDGE,Edge Rusher,30.7,A,100,94,40.0,6
+Trey Pipkins,LAC,OL,Offensive Line,30.0,D,31,25,5.0,6
+Clark Phillips III,ATL,CB,Cornerback,24.7,F,11,5,1.2,6
+Josh Jacobs,GB,RB,Running Back,28.6,A,91,85,12.0,6
+Justin Herbert,LAC,QB,Quarterback,28.5,B,73,67,52.5,6
+Derick Hall,SEA,EDGE,Edge Rusher,25.5,C,67,61,14.0,6
+Jared Goff,DET,QB,Quarterback,31.9,B,79,73,53.0,6
+Byron Murphy,MIN,CB,Cornerback,28.6,A,88,82,18.0,6
+Nik Bonitto,DEN,EDGE,Edge Rusher,26.9,A,88,84,26.5,5
+Rachaad White,WAS,RB,Running Back,27.6,D,42,37,2.0,5
+Willie Gay Jr.,MIA,LB,Linebacker,28.5,F,19,14,1.4,5
+Byron Murphy II,SEA,IDL,Interior D-Line,24.0,D,25,20,4.0,5
+Garett Bolles,DEN,OL,Offensive Line,34.3,B,84,79,20.5,5
+Michael Pittman,PIT,WR,Wide Receiver,28.9,B,71,66,17.5,5
+Julian Okwara,CLE,EDGE,Edge Rusher,28.7,F,6,1,1.2,5
+Keeanu Benton,PIT,IDL,Interior D-Line,25.1,F,14,9,1.8,5
+Tyler Conklin,DET,TE,Tight End,31.1,F,8,3,1.3,5
+Maxx Crosby,LV,EDGE,Edge Rusher,29.0,A,98,93,35.5,5
+Jeffery Simmons,TEN,IDL,Interior D-Line,29.1,A,93,88,23.5,5
+Anthony Nelson,TB,EDGE,Edge Rusher,29.5,D,38,33,5.0,5
+Cody Barton,TEN,LB,Linebacker,29.8,C,49,43,7.0,5
+Alex Anzalone,TB,EDGE,Edge Rusher,31.9,C,51,46,8.5,5
+Isaac Seumalo,ARI,OL,Offensive Line,32.8,C,52,47,10.5,5
+Lloyd Cushenberry III,BUF,OL,Offensive Line,28.8,F,6,1,1.4,5
+Mason Graham,CLE,IDL,Interior D-Line,23.0,C,57,52,10.2,5
+Jordyn Brooks,MIA,LB,Linebacker,28.9,C,58,54,8.8,4
+Andre Cisco,NYJ,S,Safety,26.4,D,40,36,2.5,4
+Sebastian Joseph-Day,PIT,EDGE,Edge Rusher,31.4,D,38,34,5.5,4
+Tyleik Williams,DET,IDL,Interior D-Line,23.5,D,25,21,4.1,4
+George Karlaftis,KC,EDGE,Edge Rusher,25.4,B,80,76,22.0,4
+Malik Hooker,DAL,S,Safety,30.4,C,50,46,5.0,4
+Joe Burrow,CIN,QB,Quarterback,29.7,A,92,88,55.0,4
+Jack Jones,SF,CB,Cornerback,28.7,F,11,7,1.2,4
+Andrew Wylie,WAS,OL,Offensive Line,32.0,F,19,15,3.8,4
+Budda Baker,ARI,S,Safety,30.6,A,97,93,18.0,4
+Dorian Williams,BUF,EDGE,Edge Rusher,25.2,F,6,2,1.3,4
+Charvarius Ward,IND,CB,Cornerback,30.3,A,86,82,18.0,4
+Nick Bosa,SF,EDGE,Edge Rusher,28.9,A,96,92,34.0,4
+Derrick Henry,BAL,RB,Running Back,32.7,A,98,95,15.0,4
+Mark Andrews,BAL,TE,Tight End,31.0,A,90,87,13.1,3
+Roquan Smith,BAL,LB,Linebacker,29.4,A,97,95,20.0,3
+Nnamdi Madubuike,BAL,IDL,Interior D-Line,28.8,A,96,93,24.5,3
+Jalen Pitre,HOU,S,Safety,27.2,B,78,75,13.0,3
+Marcus Epps,PHI,S,Safety,30.6,D,29,25,1.6,3
+JuJu Smith-Schuster,NYG,WR,Wide Receiver,29.8,F,7,4,1.3,3
+Brian O'Neill,MIN,OL,Offensive Line,31.0,B,74,71,18.5,3
+Jerome Ford,WAS,RB,Running Back,27.0,F,25,22,1.4,3
+Zach Charbonnet,SEA,RB,Running Back,25.6,D,34,32,1.7,3
+Austin Corbett,BUF,OL,Offensive Line,31.0,F,6,3,1.5,3
+Zack Baun,PHI,LB,Linebacker,29.7,A,92,89,17.0,3
+Evan Engram,DEN,TE,Tight End,32.0,B,70,67,11.5,3
+Justin Jefferson,MIN,WR,Wide Receiver,27.2,A,99,96,35.0,3
+Phillip Dorsett,LV,WR,Wide Receiver,33.7,F,7,4,1.3,3
+Christian Benford,BUF,CB,Cornerback,25.9,B,80,78,17.2,2
+Kader Kohou,KC,CB,Cornerback,27.8,F,25,22,1.8,2
+Chuba Hubbard,CAR,RB,Running Back,27.2,B,77,75,8.3,2
+Spencer Brown,BUF,OL,Offensive Line,28.5,B,71,68,18.0,2
+Carl Granderson,NO,EDGE,Edge Rusher,29.7,C,60,58,13.0,2
+Derrick Harmon,PIT,IDL,Interior D-Line,23.1,D,25,23,4.5,2
+Mekhi Blackmon,IND,CB,Cornerback,27.5,F,11,9,1.3,2
+Jalen Ramsey,PIT,CB,Cornerback,31.9,A,98,95,24.1,2
+Quinnen Williams,DAL,IDL,Interior D-Line,28.7,A,91,89,24.0,2
+Jer'Zhan Newton,WAS,IDL,Interior D-Line,24.0,F,14,12,2.4,2
+Josh Hines-Allen,JAX,EDGE,Edge Rusher,29.1,A,91,88,28.2,2
+Amarius Mims,CIN,OL,Offensive Line,23.9,F,19,17,3.8,2
+A.J. Brown,NE,WR,Wide Receiver,29.2,A,93,91,32.0,2
+Jack Fox,DET,SPEC,Special Teams,30.0,C,62,60,3.5,2
+Greg Newsome II,NYG,CB,Cornerback,26.3,C,62,60,8.0,1
+Denzel Ward,CLE,CB,Cornerback,29.3,A,91,90,20.1,1
+Devin Lloyd,CAR,LB,Linebacker,27.9,A,86,85,15.0,1
+DeForest Buckner,IND,IDL,Interior D-Line,32.5,A,87,86,23.0,1
+Zaire Franklin,GB,LB,Linebacker,30.2,C,58,57,9.0,1
+Ja'Marr Chase,CIN,WR,Wide Receiver,26.5,A,99,99,40.2,1
+Mykel Williams,SF,EDGE,Edge Rusher,22.2,D,38,38,6.2,1
+Grady Jarrett,CHI,IDL,Interior D-Line,33.3,C,68,67,14.5,1
+Tyler Booker,DAL,OL,Offensive Line,22.4,D,31,30,5.6,1
+Kyren Williams,LAR,RB,Running Back,26.0,B,82,81,11.0,1
+Derrick Nnadi,IND,IDL,Interior D-Line,30.3,F,6,5,1.5,1
+Zane Gonzalez,MIA,SPEC,Special Teams,31.3,D,27,26,1.5,1
+Sam Williams,DAL,EDGE,Edge Rusher,27.4,F,16,15,2.5,1
+Jaylon Johnson,CHI,CB,Cornerback,27.4,A,90,89,19.8,1
+CeeDee Lamb,DAL,WR,Wide Receiver,27.4,A,96,95,34.0,1
+Ezra Cleveland,JAX,OL,Offensive Line,28.3,D,40,39,8.0,1
+Brandon Aubrey,DAL,SPEC,Special Teams,31.5,A,100,99,7.0,1
+Elijah Molden,LAC,S,Safety,27.6,C,50,50,6.2,0
+Will Reichard,MIN,SPEC,Special Teams,25.6,F,11,11,1.0,0
+Micah Parsons,GB,EDGE,Edge Rusher,27.3,A,99,99,46.5,0
+Kaden Elliss,NO,LB,Linebacker,31.2,C,68,68,11.0,0
+Landon Dickerson,PHI,OL,Offensive Line,27.9,B,81,81,21.0,0
+Zach Allen,DEN,EDGE,Edge Rusher,29.0,B,82,82,25.5,0
+Penei Sewell,DET,OL,Offensive Line,25.9,A,97,97,28.0,0
+Robert Spillane,NE,LB,Linebacker,30.7,C,68,68,11.0,0
+Mack Wilson,ARI,LB,Linebacker,28.5,D,32,32,4.2,0
+Chris Jones,KC,IDL,Interior D-Line,32.2,A,100,100,31.8,0
+Fred Warner,SF,LB,Linebacker,29.8,A,100,100,21.0,0
+Quan Martin,WAS,S,Safety,26.4,D,29,29,1.9,0
+George Kittle,SF,TE,Tight End,32.9,A,100,100,19.1,0
+Drake Maye,NE,QB,Quarterback,24.0,D,25,25,9.2,0
+Saquon Barkley,PHI,RB,Running Back,29.6,A,100,100,20.6,0
+Nico Collins,HOU,WR,Wide Receiver,27.5,A,88,88,30.0,0
+Josh Metellus,MIN,S,Safety,28.6,C,69,69,12.0,-1
+Dyami Brown,WAS,WR,Wide Receiver,26.8,F,18,20,1.8,-1
+Jeremiah Owusu-Koramoah,CLE,LB,Linebacker,26.0,B,77,78,12.5,-1
+Pat Surtain II,DEN,CB,Cornerback,26.4,A,93,94,24.0,-1
+Sauce Gardner,IND,CB,Cornerback,25.0,A,98,99,30.1,-1
+Chris Boswell,PIT,SPEC,Special Teams,35.5,A,98,99,7.0,-1
+Tristan Wirfs,TB,OL,Offensive Line,27.6,A,97,98,28.1,-1
+Jerry Jeudy,CLE,WR,Wide Receiver,27.4,C,65,66,17.5,-1
+Walter Nolen,ARI,IDL,Interior D-Line,22.9,D,25,27,4.8,-2
+Carlton Davis III,NE,CB,Cornerback,29.7,B,80,82,18.0,-2
+Jalen Thompson,DAL,S,Safety,28.1,C,64,65,11.0,-2
+Trent McDuffie,LAR,CB,Cornerback,26.0,A,98,100,31.0,-2
+David Montgomery,HOU,RB,Running Back,29.2,B,72,74,8.2,-2
+Elijah Mitchell,PHI,RB,Running Back,28.3,F,7,9,1.2,-2
+Michael Carter II,PHI,CB,Cornerback,27.5,D,32,35,2.8,-2
+Will Campbell,NE,OL,Offensive Line,22.7,C,46,48,10.9,-2
+Michael Burton,CLE,RB,Running Back,34.6,F,17,19,1.4,-3
+Reed Blankenship,HOU,S,Safety,27.5,C,58,61,8.2,-3
+Denzel Perryman,LAC,LB,Linebacker,33.7,F,19,22,2.8,-3
+Harrison Butker,KC,SPEC,Special Teams,31.1,A,90,93,6.4,-3
+Trey McBride,ARI,TE,Tight End,26.8,A,93,97,19.0,-3
+Matt Araiza,KC,SPEC,Special Teams,26.3,F,11,14,1.1,-3
+Kerby Joseph,DET,S,Safety,25.8,A,94,97,21.2,-3
+Jonathan Taylor,IND,RB,Running Back,27.6,A,87,89,14.0,-3
+Tee Higgins,CIN,WR,Wide Receiver,27.6,B,82,85,28.8,-3
+Cesar Ruiz,NO,OL,Offensive Line,27.2,C,46,49,11.0,-3
+Trey Smith,KC,OL,Offensive Line,27.2,A,86,89,23.5,-3
+Tyler Nubin,NYG,S,Safety,25.2,D,29,32,2.0,-3
+Aaron Brewer,MIA,OL,Offensive Line,28.8,D,31,35,7.0,-3
+Marquise Brown,PHI,WR,Wide Receiver,29.2,D,41,45,5.0,-3
+Nick Westbrook-Ikhine,IND,WR,Wide Receiver,29.4,F,7,11,1.4,-4
+Kenneth Walker III,KC,RB,Running Back,25.9,A,87,91,14.4,-4
+Harrison Phillips,NYJ,IDL,Interior D-Line,30.6,D,38,43,7.5,-4
+Derek Stingley Jr.,HOU,CB,Cornerback,25.2,A,93,98,30.0,-4
+Aidan Hutchinson,DET,EDGE,Edge Rusher,26.1,A,94,98,45.0,-4
+Kyle Hamilton,BAL,S,Safety,25.5,A,94,98,25.1,-4
+Tutu Atwell,MIA,WR,Wide Receiver,26.9,F,7,11,1.4,-4
+Christian McCaffrey,SF,RB,Running Back,30.2,A,95,98,19.0,-4
+Kyler Gordon,CHI,CB,Cornerback,26.7,C,67,72,13.3,-4
+Khalil Shakir,BUF,WR,Wide Receiver,26.6,C,54,57,13.2,-4
+Peter Skoronski,TEN,OL,Offensive Line,25.1,F,19,23,4.9,-4
+Courtland Sutton,DEN,WR,Wide Receiver,30.9,B,71,75,23.0,-4
+Matthew Stafford,LAR,QB,Quarterback,38.6,B,83,88,55.0,-4
+Danielle Hunter,HOU,EDGE,Edge Rusher,31.8,A,92,95,40.1,-4
+Maxwell Hairston,BUF,CB,Cornerback,23.1,D,41,46,3.8,-4
+DJ Moore,BUF,WR,Wide Receiver,29.4,B,77,82,27.5,-5
+Zach Sieler,MIA,IDL,Interior D-Line,31.0,B,76,81,21.3,-5
+Christian Darrisaw,MIN,OL,Offensive Line,27.2,A,89,94,26.0,-5
+Tykee Smith,TB,S,Safety,25.5,F,8,14,1.4,-5
+Armand Membou,NYJ,OL,Offensive Line,22.4,D,31,37,8.0,-5
+Devin Singletary,NYG,RB,Running Back,29.0,F,7,12,1.3,-5
+Arden Key,IND,EDGE,Edge Rusher,30.3,D,38,44,8.0,-5
+Mike McGlinchey,DEN,OL,Offensive Line,31.6,C,60,65,17.5,-5
+David Onyemata,NYJ,IDL,Interior D-Line,33.8,C,48,54,10.5,-5
+Kolton Miller,LV,OL,Offensive Line,30.9,B,77,83,22.0,-6
+Zach Tom,GB,OL,Offensive Line,27.4,B,77,83,22.0,-6
+Jordan Meredith,LV,OL,Offensive Line,28.7,F,6,12,3.5,-6
+Clelin Ferrell,MIA,EDGE,Edge Rusher,29.0,F,6,12,2.0,-6
+Drake London,ATL,WR,Wide Receiver,25.1,A,91,98,35.3,-6
+Grant Delpit,CLE,S,Safety,27.9,C,64,69,12.0,-6
+Jawaan Taylor,ATL,OL,Offensive Line,28.8,F,19,25,5.0,-6
+Shemar Stewart,CIN,EDGE,Edge Rusher,22.8,D,26,32,4.7,-6
+Brandon Aiyuk,SF,WR,Wide Receiver,28.0,B,82,88,30.0,-6
+Keon Coleman,BUF,WR,Wide Receiver,23.3,F,18,24,2.5,-6
+DaRon Bland,DAL,CB,Cornerback,27.1,A,86,93,22.5,-7
+Jordan Morgan,GB,OL,Offensive Line,25.1,F,6,13,3.5,-7
+Laremy Tunsil,WAS,OL,Offensive Line,32.1,A,93,100,30.1,-7
+Bhayshul Tuten,JAX,RB,Running Back,24.5,F,7,14,1.3,-7
+Corliss Waitman,SF,SPEC,Special Teams,31.1,F,11,18,1.3,-7
+Luther Burden III,CHI,WR,Wide Receiver,22.7,F,18,26,2.7,-7
+Pat Freiermuth,PIT,TE,Tight End,27.9,C,67,73,12.1,-7
+Marquez Valdes-Scantling,DAL,WR,Wide Receiver,31.9,F,7,15,1.5,-7
+Dylan Parham,NYJ,OL,Offensive Line,27.0,D,31,39,8.0,-8
+Josh Simmons,KC,OL,Offensive Line,23.7,F,6,14,3.7,-8
+Andrew Thomas,NYG,OL,Offensive Line,27.6,B,81,89,23.5,-8
+Pete Werner,NO,LB,Linebacker,27.2,D,41,49,7.5,-8
+Jahdae Barron,DEN,CB,Cornerback,24.7,D,41,49,4.5,-8
+Mike Gesicki,CIN,TE,Tight End,30.9,D,38,47,8.5,-8
+Nick Bolton,KC,LB,Linebacker,26.5,B,77,85,15.0,-8
+Rashawn Slater,LAC,OL,Offensive Line,27.4,A,91,99,28.5,-8
+T.J. Watt,PIT,EDGE,Edge Rusher,31.9,A,88,96,41.0,-8
+Rashod Bateman,BAL,WR,Wide Receiver,26.8,C,48,56,12.2,-8
+Jevon Holland,NYG,S,Safety,26.5,B,78,86,15.1,-8
+Jihaad Campbell,PHI,LB,Linebacker,22.5,F,19,27,3.7,-8
+Ed Oliver,BUF,IDL,Interior D-Line,28.7,C,63,71,17.0,-8
+Calen Bullock,HOU,S,Safety,23.3,F,8,17,1.5,-8
+Alfred Collins,SF,IDL,Interior D-Line,24.9,F,6,14,2.6,-8
+Taylor Moton,CAR,OL,Offensive Line,32.0,B,74,83,22.0,-9
+Calijah Kancey,TB,EDGE,Edge Rusher,25.5,F,16,25,3.6,-9
+Kenny Clark,DAL,IDL,Interior D-Line,30.9,B,72,81,21.3,-9
+Quay Walker,LV,EDGE,Edge Rusher,26.3,C,51,59,13.5,-9
+Cameron Johnston,PIT,SPEC,Special Teams,34.5,F,11,20,1.3,-9
+Jauan Jennings,MIN,WR,Wide Receiver,29.1,D,41,50,8.0,-9
+Rigoberto Sanchez,IND,SPEC,Special Teams,32.0,D,39,48,2.5,-9
+Tyler Smith,DAL,OL,Offensive Line,25.4,B,81,90,24.0,-9
+Tyler Allgeier,ARI,RB,Running Back,26.4,C,54,62,6.1,-9
+Tyrique Stevenson,CHI,CB,Cornerback,26.3,F,11,21,1.6,-10
+Jakobi Meyers,JAX,WR,Wide Receiver,29.8,C,59,70,20.0,-10
+Derwin James,LAC,S,Safety,30.1,A,90,100,25.2,-10
+Jessie Bates,ATL,S,Safety,29.5,B,78,88,16.0,-10
+Rome Odunze,CHI,WR,Wide Receiver,24.2,D,36,46,5.7,-10
+Trey Benson,ARI,RB,Running Back,24.1,F,17,28,1.5,-11
+Charles Omenihu,WAS,EDGE,Edge Rusher,29.0,F,16,27,4.0,-11
+Ashton Jeanty,LV,RB,Running Back,22.7,C,66,77,9.0,-11
+Trevon Diggs,SEA,CB,Cornerback,27.0,B,75,86,19.4,-11
+J.K. Dobbins,DEN,RB,Running Back,27.7,C,60,70,8.0,-11
+Dalvin Tomlinson,LAC,IDL,Interior D-Line,32.5,D,25,36,6.2,-11
+Josh Sweat,ARI,EDGE,Edge Rusher,29.4,C,60,71,19.1,-11
+Micah McFadden,NYG,LB,Linebacker,26.7,F,19,30,3.8,-11
+Jake Matthews,ATL,OL,Offensive Line,34.6,B,74,87,22.5,-12
+Noah Brown,LV,WR,Wide Receiver,30.0,F,18,30,3.2,-12
+Darnell Savage,PIT,S,Safety,29.1,F,8,20,1.5,-12
+Jordan Mason,MIN,RB,Running Back,27.3,D,42,54,5.3,-12
+Trey Amos,WAS,CB,Cornerback,24.5,F,11,23,1.8,-12
+Jaylen Waddle,DEN,WR,Wide Receiver,27.8,B,71,83,28.2,-12
+Deommodore Lenoir,SF,CB,Cornerback,26.9,C,67,79,18.0,-12
+Devonte Wyatt,GB,IDL,Interior D-Line,28.4,F,6,18,3.2,-12
+Donovan Ezeiruaku,DAL,EDGE,Edge Rusher,23.3,F,6,18,2.5,-12
+Avonte Maddox,DET,S,Safety,30.4,F,8,20,1.5,-12
+Jaylen Warren,PIT,RB,Running Back,27.8,C,47,60,6.0,-12
+Dawson Knox,BUF,TE,Tight End,29.8,D,27,40,6.7,-13
+Kyle Juszczyk,SF,RB,Running Back,35.4,D,34,47,3.8,-13
+Jaycee Horn,CAR,CB,Cornerback,26.8,B,83,96,25.0,-13
+Devin Duvernay,ARI,WR,Wide Receiver,29.0,F,7,21,1.8,-13
+D.J. Reed,DET,CB,Cornerback,29.8,C,62,75,16.0,-13
+Jourdan Lewis,JAX,CB,Cornerback,31.0,C,50,63,10.0,-13
+Chris Godwin Jr.,TB,WR,Wide Receiver,30.5,C,59,73,22.0,-13
+Jonathan Greenard,PHI,EDGE,Edge Rusher,29.3,B,77,90,30.0,-13
+Jayden Reed,GB,WR,Wide Receiver,26.3,C,48,61,16.8,-13
+Montez Sweat,CHI,EDGE,Edge Rusher,30.0,C,67,81,24.5,-14
+Will Fries,MIN,OL,Offensive Line,28.4,C,52,66,17.5,-14
+Samson Ebukam,ATL,EDGE,Edge Rusher,31.3,F,6,20,2.8,-14
+Tedarrell Slaton,CIN,IDL,Interior D-Line,28.9,D,25,39,7.0,-14
+Chase McLaughlin,TB,SPEC,Special Teams,30.4,C,62,77,4.1,-14
+Jake Bailey,ATL,SPEC,Special Teams,29.2,D,39,53,3.0,-14
+Kelvin Banks Jr.,NO,OL,Offensive Line,22.5,F,19,34,6.9,-14
+Milton Williams,NE,IDL,Interior D-Line,27.4,B,81,96,26.0,-14
+Will McDonald IV,NYJ,EDGE,Edge Rusher,27.2,F,16,29,4.1,-14
+Jonathon Brooks,CAR,RB,Running Back,23.1,F,25,39,2.1,-14
+Tony Adams,TEN,S,Safety,27.6,F,20,34,2.1,-14
+John Franklin-Myers,TEN,EDGE,Edge Rusher,29.9,C,60,74,21.0,-14
+Patrick Queen,PIT,LB,Linebacker,27.1,C,68,81,13.7,-14
+Terrel Bernard,BUF,LB,Linebacker,27.3,C,49,62,10.5,-14
+Jack Campbell,DET,LB,Linebacker,26.0,B,84,97,20.2,-14
+Grey Zabel,SEA,OL,Offensive Line,24.4,F,6,21,4.6,-15
+Donte Jackson,LAC,CB,Cornerback,30.8,D,41,57,6.5,-15
+Dalton Kincaid,BUF,TE,Tight End,26.9,F,8,23,3.4,-15
+Dorance Armstrong,WAS,EDGE,Edge Rusher,29.2,D,38,54,11.0,-15
+Tyler Linderbaum,LV,OL,Offensive Line,26.4,B,81,96,27.0,-15
+Laiatu Latu,IND,EDGE,Edge Rusher,25.7,F,16,31,4.3,-15
+Paulson Adebo,NYG,CB,Cornerback,27.2,C,67,82,18.0,-15
+Tremaine Edmunds,NYG,LB,Linebacker,28.3,C,58,73,12.0,-15
+Connor McGovern,BUF,OL,Offensive Line,28.8,D,40,55,13.1,-15
+Rico Dowdle,PIT,RB,Running Back,28.2,C,47,62,6.1,-15
+Robert Hunt,CAR,OL,Offensive Line,30.0,C,60,75,20.0,-15
+Benjamin Morrison,TB,CB,Cornerback,22.5,F,11,27,2.1,-16
+Garrett Wilson,NYJ,WR,Wide Receiver,26.1,B,77,93,32.5,-16
+Garrett Bradbury,CHI,OL,Offensive Line,31.2,F,6,22,4.7,-16
+E.J. Speed,HOU,LB,Linebacker,31.3,F,19,35,5.0,-16
+Alex Singleton,DEN,LB,Linebacker,32.7,D,32,49,7.5,-16
+Camryn Bynum,IND,S,Safety,28.1,C,69,85,15.0,-16
+Alvin Kamara,NO,RB,Running Back,31.1,B,72,88,12.2,-16
+Chase Young,NO,EDGE,Edge Rusher,27.4,C,51,68,17.0,-17
+Samaje Perine,CIN,RB,Running Back,31.0,F,17,33,1.8,-17
+D'Andre Swift,CHI,RB,Running Back,27.6,C,54,70,8.0,-17
+Terrion Arnold,DET,CB,Cornerback,23.4,F,25,42,3.6,-17
+Brock Purdy,SF,QB,Quarterback,26.7,C,56,73,53.0,-17
+Riq Woolen,PHI,CB,Cornerback,27.3,C,50,68,12.0,-18
+Deebo Samuel Sr.,SF,WR,Wide Receiver,30.0,C,59,77,23.8,-18
+Cairo Santos,CHI,SPEC,Special Teams,34.8,C,49,67,3.9,-18
+Quentin Johnston,LAC,WR,Wide Receiver,25.0,F,18,37,3.5,-18
+Kendre Miller,NO,RB,Running Back,24.2,F,7,25,1.4,-18
+Alohi Gilman,KC,S,Safety,29.0,D,40,58,8.0,-18
+AJ Epenesa,PHI,EDGE,Edge Rusher,27.0,F,16,35,6.0,-19
+Javon Bullard,GB,S,Safety,24.0,F,8,27,1.7,-19
+Kool-Aid McKinstry,NO,CB,Cornerback,23.9,F,11,30,2.3,-19
+Carson Schwesinger,CLE,LB,Linebacker,23.5,F,5,24,3.0,-19
+Alim McNeill,DET,IDL,Interior D-Line,26.3,B,72,91,24.2,-19
+Zyon McCollum,TB,CB,Cornerback,27.3,C,56,75,16.0,-19
+Jaleel McLaughlin,DEN,RB,Running Back,26.0,F,7,26,1.4,-19
+Kam Curl,LAR,S,Safety,27.5,C,50,69,12.0,-19
+Kendrick Bourne,ARI,WR,Wide Receiver,31.1,D,26,45,5.0,-19
+Ka'imi Fairbairn,HOU,SPEC,Special Teams,32.6,B,76,96,6.5,-20
+Justice Hill,BAL,RB,Running Back,28.8,F,25,45,3.0,-20
+Nick Folk,ATL,SPEC,Special Teams,41.8,C,62,82,4.5,-20
+Calvin Ridley,TEN,WR,Wide Receiver,31.7,C,48,68,17.6,-20
+Brian Burns,NYG,EDGE,Edge Rusher,28.4,C,67,87,28.2,-20
+Cole Kmet,CHI,TE,Tight End,27.5,C,58,78,12.5,-20
+Breece Hall,NYJ,RB,Running Back,25.3,B,72,93,14.5,-21
+Uchenna Nwosu,SEA,EDGE,Edge Rusher,29.7,D,26,47,9.8,-21
+Jonathon Cooper,DEN,EDGE,Edge Rusher,28.6,D,38,59,13.5,-21
+Christian Barmore,NE,IDL,Interior D-Line,27.1,C,57,79,21.0,-21
+George Pickens,DAL,WR,Wide Receiver,25.5,C,59,80,27.3,-21
+Matthew Golden,GB,WR,Wide Receiver,23.1,F,18,39,4.4,-21
+Will Johnson,ARI,CB,Cornerback,23.4,F,11,32,2.4,-21
+Ricky Pearsall,SF,WR,Wide Receiver,26.0,F,7,29,3.1,-22
+Bernhard Raimann,IND,OL,Offensive Line,28.9,B,71,92,25.0,-22
+Dexter Lawrence,CIN,IDL,Interior D-Line,28.8,B,76,98,28.0,-22
+Jason Myers,SEA,SPEC,Special Teams,35.3,C,62,84,5.3,-22
+Tetairoa McMillan,CAR,WR,Wide Receiver,23.4,D,26,48,7.0,-22
+Kaleb Johnson,PIT,RB,Running Back,23.0,F,7,30,1.6,-23
+Cobie Durant,DAL,CB,Cornerback,28.6,F,25,48,4.0,-23
+D.J. Jones,DEN,IDL,Interior D-Line,31.6,D,38,62,13.0,-23
+DK Metcalf,PIT,WR,Wide Receiver,28.7,B,71,94,33.0,-23
+Jaxon Smith-Njigba,SEA,WR,Wide Receiver,24.5,B,77,100,42.2,-23
+Tre'von Moehrig,CAR,S,Safety,27.2,C,69,92,17.0,-23
+A.J. Terrell,ATL,CB,Cornerback,27.9,C,67,91,20.2,-24
+Braden Mann,PHI,SPEC,Special Teams,28.8,D,39,63,3.5,-24
+Tyler Warren,IND,TE,Tight End,24.3,F,8,33,5.2,-25
+Omarion Hampton,LAC,RB,Running Back,23.5,F,25,49,4.4,-25
+Aaron Rodgers,PIT,QB,Quarterback,42.7,F,17,42,22.5,-25
+Bradley Chubb,BUF,EDGE,Edge Rusher,30.2,D,38,63,14.5,-25
+Bryce Young,CAR,QB,Quarterback,25.1,F,8,33,9.5,-25
+TreVeyon Henderson,NE,RB,Running Back,23.9,F,17,42,2.8,-25
+Travis Jones,BAL,IDL,Interior D-Line,26.9,D,38,64,13.5,-26
+Amik Robertson,WAS,CB,Cornerback,28.2,D,32,58,7.5,-26
+Luke Goedeke,TB,OL,Offensive Line,27.8,C,60,87,22.5,-26
+Jameson Williams,DET,WR,Wide Receiver,25.4,C,54,79,26.7,-26
+Cameron Dicker,LAC,SPEC,Special Teams,26.3,C,62,89,5.5,-27
+Deonte Banks,NYG,CB,Cornerback,25.4,F,11,38,3.4,-27
+Kalif Raymond,CHI,WR,Wide Receiver,32.1,F,7,34,3.5,-27
+Riley Dixon,TB,SPEC,Special Teams,33.0,D,27,53,3.0,-27
+Jake Ferguson,DAL,TE,Tight End,27.6,C,52,78,12.5,-27
+Daron Payne,WAS,IDL,Interior D-Line,29.3,C,57,84,22.5,-27
+Marcus Jones,NE,CB,Cornerback,27.9,D,41,68,12.0,-27
+Romeo Doubs,NE,WR,Wide Receiver,26.4,D,36,63,17.0,-27
+Rashid Shaheed,SEA,WR,Wide Receiver,28.0,D,36,63,17.0,-27
+Jonah Jackson,CHI,OL,Offensive Line,29.6,D,31,59,14.8,-27
+K'Lavon Chaisson,WAS,EDGE,Edge Rusher,27.1,D,26,54,11.0,-28
+Noah Gray,KC,TE,Tight End,27.3,F,8,37,6.0,-28
+Caleb Williams,CHI,QB,Quarterback,24.8,F,8,38,9.9,-29
+Darius Slayton,NYG,WR,Wide Receiver,29.6,D,26,55,12.0,-29
+Sam Darnold,SEA,QB,Quarterback,29.2,F,21,50,33.5,-29
+Osa Odighizuwa,SF,IDL,Interior D-Line,28.1,C,48,77,20.0,-29
+Arik Armstead,JAX,IDL,Interior D-Line,32.8,D,38,67,14.5,-29
+Paris Johnson Jr.,ARI,OL,Offensive Line,25.2,F,6,36,7.0,-29
+Sam Martin,CAR,SPEC,Special Teams,36.5,F,11,40,1.9,-29
+B.J. Hill,CIN,IDL,Interior D-Line,31.4,D,25,55,11.0,-30
+Charles Cross,SEA,OL,Offensive Line,25.8,C,65,95,26.1,-30
+Cade Otton,TB,TE,Tight End,27.4,D,27,57,10.0,-30
+Blake Gillikin,ARI,SPEC,Special Teams,28.6,F,11,42,1.9,-31
+Dre'Mont Jones,NE,EDGE,Edge Rusher,29.7,D,26,56,12.2,-31
+M.J. Stewart,HOU,S,Safety,31.0,F,8,39,2.7,-31
+Kristian Fulton,KC,CB,Cornerback,28.0,D,32,63,10.0,-31
+Keisean Nixon,GB,CB,Cornerback,29.2,F,25,56,6.0,-31
+De'Von Achane,MIA,RB,Running Back,24.9,C,66,96,16.0,-31
+Zion Johnson,CLE,OL,Offensive Line,26.8,D,31,62,16.5,-31
+Luke Wattenberg,DEN,OL,Offensive Line,29.0,F,19,51,12.0,-32
+Jahlani Tavai,JAX,LB,Linebacker,29.0,F,5,38,5.3,-32
+Nick Cross,WAS,S,Safety,25.0,F,20,53,6.5,-32
+Travis Etienne,NO,RB,Running Back,27.6,C,54,85,12.0,-32
+Rhamondre Stevenson,NE,RB,Running Back,28.5,C,47,79,9.0,-32
+KaVontae Turpin,DAL,WR,Wide Receiver,30.1,F,7,40,4.5,-33
+Alaric Jackson,LAR,OL,Offensive Line,28.1,D,40,73,19.2,-33
+Tyree Wilson,NO,EDGE,Edge Rusher,26.3,F,6,39,6.3,-33
+Chig Okonkwo,WAS,TE,Tight End,27.0,F,18,52,9.0,-33
+Emeka Egbuka,TB,WR,Wide Receiver,23.9,F,7,41,4.5,-34
+Patrick Mekari,JAX,OL,Offensive Line,29.1,F,19,53,12.5,-34
+Azeez Al-Shaair,HOU,LB,Linebacker,29.1,C,58,92,18.0,-34
+Joshua Williams,TEN,CB,Cornerback,26.9,F,11,48,4.0,-36
+Malaki Starks,BAL,S,Safety,22.8,F,8,44,4.1,-36
+Javonte Williams,DAL,RB,Running Back,26.4,D,34,70,8.0,-36
+Walker Little,JAX,OL,Offensive Line,27.4,F,19,57,13.5,-37
+Dalton Schultz,HOU,TE,Tight End,30.1,C,45,83,12.6,-38
+Sheldon Rankins,HOU,IDL,Interior D-Line,32.4,F,6,45,8.5,-38
+Jordan Love,GB,QB,Quarterback,27.8,C,50,88,55.0,-38
+Jon Runyan,NYG,OL,Offensive Line,29.1,F,6,44,10.0,-38
+Kwity Paye,LV,EDGE,Edge Rusher,27.8,D,26,65,16.0,-39
+Wan'Dale Robinson,TEN,WR,Wide Receiver,25.7,D,26,66,17.5,-40
+Benjamin St-Juste,GB,CB,Cornerback,29.0,F,11,51,5.0,-40
+Abraham Lucas,SEA,OL,Offensive Line,27.9,F,19,61,15.3,-41
+Mike Jackson,CAR,CB,Cornerback,29.6,F,11,53,5.2,-42
+Jake Elliott,PHI,SPEC,Special Teams,31.6,C,49,91,5.7,-42
+Bryan Cook,CIN,S,Safety,27.0,D,40,81,13.4,-42
+Teair Tart,LAC,IDL,Interior D-Line,29.5,F,6,49,10.0,-43
+A'Shawn Robinson,TB,EDGE,Edge Rusher,31.4,F,6,49,10.0,-43
+Maliek Collins,CLE,IDL,Interior D-Line,31.4,F,6,49,10.0,-43
+Ja'Quan McMillian,DEN,CB,Cornerback,26.2,F,11,54,5.8,-43
+Nakobe Dean,LV,LB,Linebacker,25.7,D,32,76,12.0,-43
+Amani Hooker,TEN,S,Safety,28.2,D,40,83,13.5,-43
+Dak Prescott,DAL,QB,Quarterback,33.1,C,56,100,60.0,-44
+Christian Watson,GB,WR,Wide Receiver,27.3,D,31,75,23.0,-44
+Cam Jurgens,PHI,OL,Offensive Line,27.0,F,19,63,17.0,-44
+Tyson Campbell,CLE,CB,Cornerback,26.5,D,41,85,19.1,-44
+Jaylen Watson,LAR,CB,Cornerback,28.0,D,32,77,17.0,-44
+Darnell Washington,PIT,TE,Tight End,25.0,F,18,63,10.5,-45
+Antoine Winfield Jr.,TB,S,Safety,28.0,C,50,95,21.0,-45
+Isaiah Likely,NYG,TE,Tight End,26.4,C,45,90,13.3,-45
+Boye Mafe,CIN,EDGE,Edge Rusher,27.8,D,26,72,20.0,-46
+Dontayvion Wicks,PHI,WR,Wide Receiver,25.2,F,7,54,10.2,-46
+Travon Walker,JAX,EDGE,Edge Rusher,25.7,D,38,85,27.5,-46
+Tytus Howard,CLE,OL,Offensive Line,30.3,D,40,87,22.5,-47
+Dan Moore Jr.,TEN,OL,Offensive Line,27.9,D,31,79,20.5,-48
+Alec Pierce,IND,WR,Wide Receiver,26.3,D,36,84,28.5,-48
+Wil Lutz,DEN,SPEC,Special Teams,32.2,D,39,87,5.4,-48
+Jermaine Eluemunor,NYG,OL,Offensive Line,31.7,F,6,54,13.0,-48
+Will Anderson Jr.,HOU,EDGE,Edge Rusher,25.0,C,51,100,50.0,-49
+Eric Stokes,LV,CB,Cornerback,27.5,F,11,63,10.0,-52
+Ryan Wright,NO,SPEC,Special Teams,26.3,F,11,63,3.5,-52
+David Edwards,NO,OL,Offensive Line,29.5,F,6,60,15.2,-53
+Odafe Oweh,WAS,EDGE,Edge Rusher,27.7,D,26,79,24.0,-54
+Devin Bush,CHI,LB,Linebacker,28.1,F,5,59,10.0,-54
+Tershawn Wharton,CAR,IDL,Interior D-Line,28.2,F,14,70,15.0,-55
+Jordan Davis,PHI,IDL,Interior D-Line,26.6,D,38,96,26.0,-57
+Brandon Stephens,NYJ,CB,Cornerback,28.7,F,11,68,12.0,-57
+Kenneth Gainwell,TB,RB,Running Back,27.5,F,7,65,7.0,-58
+Kyle Pitts,ATL,TE,Tight End,25.9,D,33,93,15.0,-60
+Alex Highsmith,PIT,EDGE,Edge Rusher,29.1,F,6,68,17.0,-62
+Cordale Flott,TEN,CB,Cornerback,25.0,F,11,73,15.0,-62
+Quentin Lake,LAR,S,Safety,27.6,F,8,73,12.8,-64
+Jordan Stout,NYG,SPEC,Special Teams,28.1,F,11,77,4.1,-66
+Aaron Banks,GB,OL,Offensive Line,29.0,F,6,73,19.2,-66
+Eddy Pineiro,SF,SPEC,Special Teams,31.0,F,11,80,4.2,-69
+Coby Bryant,CHI,S,Safety,27.4,F,8,79,13.3,-70
+Trevor Lawrence,JAX,QB,Quarterback,26.9,F,8,88,55.0,-79
+Jaelan Phillips,CAR,EDGE,Edge Rusher,27.3,F,6,90,30.0,-84

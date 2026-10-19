@@ -1,0 +1,45 @@
+era,pos_group,position,n_team_seasons,avg_cap_pct
+17-Game Era,CB,Cornerback,8,0.073
+17-Game Era,EDGE,Edge Rusher,8,0.08424999999999999
+17-Game Era,IDL,Interior D-Line,8,0.11700000000000002
+17-Game Era,LB,Linebacker,8,0.036875000000000005
+17-Game Era,OL,Offensive Line,8,0.151625
+17-Game Era,QB,Quarterback,8,0.101
+17-Game Era,RB,Running Back,8,0.03375
+17-Game Era,S,Safety,8,0.04687500000000001
+17-Game Era,SPEC,Special Teams,8,0.02525
+17-Game Era,TE,Tight End,8,0.056
+17-Game Era,WR,Wide Receiver,8,0.08575
+Early Cap Era,CB,Cornerback,6,0.06133333333333333
+Early Cap Era,EDGE,Edge Rusher,2,0.0775
+Early Cap Era,IDL,Interior D-Line,4,0.036250000000000004
+Early Cap Era,LB,Linebacker,4,0.0335
+Early Cap Era,OL,Offensive Line,4,0.05225
+Early Cap Era,QB,Quarterback,13,0.07015384615384616
+Early Cap Era,RB,Running Back,6,0.052833333333333336
+Early Cap Era,S,Safety,3,0.04833333333333334
+Early Cap Era,SPEC,Special Teams,4,0.0205
+Early Cap Era,TE,Tight End,4,0.03375
+Early Cap Era,WR,Wide Receiver,4,0.04050000000000001
+Post-2004 Rules,CB,Cornerback,12,0.028833333333333336
+Post-2004 Rules,EDGE,Edge Rusher,9,0.05200000000000001
+Post-2004 Rules,IDL,Interior D-Line,9,0.012000000000000002
+Post-2004 Rules,LB,Linebacker,8,0.013750000000000002
+Post-2004 Rules,OL,Offensive Line,12,0.025333333333333336
+Post-2004 Rules,QB,Quarterback,13,0.06553846153846153
+Post-2004 Rules,RB,Running Back,9,0.030333333333333337
+Post-2004 Rules,S,Safety,9,0.017555555555555557
+Post-2004 Rules,SPEC,Special Teams,4,0.01675
+Post-2004 Rules,TE,Tight End,7,0.01042857142857143
+Post-2004 Rules,WR,Wide Receiver,10,0.0393
+Post-2011 CBA,CB,Cornerback,20,0.06050000000000001
+Post-2011 CBA,EDGE,Edge Rusher,20,0.0986
+Post-2011 CBA,IDL,Interior D-Line,20,0.07094999999999999
+Post-2011 CBA,LB,Linebacker,20,0.06975
+Post-2011 CBA,OL,Offensive Line,20,0.1409
+Post-2011 CBA,QB,Quarterback,20,0.0877
+Post-2011 CBA,RB,Running Back,20,0.04515000000000001
+Post-2011 CBA,S,Safety,20,0.06955
+Post-2011 CBA,SPEC,Special Teams,17,0.0251764705882353
+Post-2011 CBA,TE,Tight End,19,0.05278947368421053
+Post-2011 CBA,WR,Wide Receiver,20,0.0915
