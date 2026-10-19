@@ -14,6 +14,7 @@ dbt sources, so every dbt model depends on the landing step.
 Run the UI:   dagster dev -f orchestration/definitions.py
 """
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -63,6 +64,13 @@ os.environ.setdefault("DBT_PROFILES_DIR", str(WAREHOUSE_DIR))
 
 dbt_project = DbtProject(project_dir=WAREHOUSE_DIR)
 dbt_project.prepare_if_dev()  # runs `dbt parse` under `dagster dev`
+
+# Resolve the dbt executable: the local uv venv when present (dbt isn't on PATH
+# under bare python), else dbt on PATH (the Docker image / CI install it globally).
+# dagster-dbt does not locate dbt itself, so this must be an explicit path.
+_DBT_EXECUTABLE = str(REPO / ".venv" / "bin" / "dbt")
+if not Path(_DBT_EXECUTABLE).exists():
+    _DBT_EXECUTABLE = shutil.which("dbt") or "dbt"
 
 
 #: pyspark 3.5 on Java 17+ needs these module opens; harmless on 11, and the
@@ -227,7 +235,7 @@ defs = Definitions(
     resources={
         "dbt": DbtCliResource(
             project_dir=dbt_project,
-            dbt_executable=str(REPO / ".venv" / "bin" / "dbt"),
+            dbt_executable=_DBT_EXECUTABLE,
         )
     },
 )
