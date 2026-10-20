@@ -44,6 +44,42 @@ def _verdict() -> pd.DataFrame:
     return cap_efficiency.efficiency_verdict().reset_index()
 
 
+#: Full position names for display (match the Tableau dashboard's labels).
+_POS_FULL = {"QB": "Quarterback", "RB": "Running Back", "WR": "Wide Receiver",
+             "TE": "Tight End", "OL": "Offensive Line", "IDL": "Interior D-Line",
+             "EDGE": "Edge Rusher", "LB": "Linebacker", "CB": "Cornerback",
+             "S": "Safety", "SPEC": "Special Teams"}
+
+
+def _premium_fig(prem: pd.DataFrame):
+    """Diverging horizontal bar of champion premium by position — mirrors the
+    live Tableau dashboard: green = champions pay up, orange = value, sorted
+    with percentage labels and the same headline."""
+    import plotly.graph_objects as go
+
+    d = prem.copy()
+    d["position"] = d["pos_group"].map(_POS_FULL).fillna(d["pos_group"])
+    d["pp"] = d["premium"] * 100                     # fraction of cap -> points
+    d = d.sort_values("premium")                     # ascending -> TE lands on top
+    pay_up = d["premium"] > 0
+    fig = go.Figure(go.Bar(
+        x=d["pp"], y=d["position"], orientation="h",
+        marker_color=["#1a7f37" if up else "#d4691e" for up in pay_up],
+        text=[f"{v:+.2f}%" for v in d["pp"]], textposition="outside",
+        cliponaxis=False,
+        hovertemplate="%{y}: %{x:+.2f} pts of cap vs league avg<extra></extra>"))
+    fig.update_layout(
+        title=dict(text="Where Super Bowl winners overspend", font=dict(size=18)),
+        xaxis_title="Champion cap share − league average (percentage points)",
+        yaxis_title=None, height=420, showlegend=False,
+        plot_bgcolor="white", font=dict(size=13),
+        margin=dict(l=10, r=48, t=52, b=36))
+    fig.update_xaxes(ticksuffix="%", gridcolor="#eef1f3", zeroline=True,
+                     zerolinecolor="#c9ced4", zerolinewidth=1)
+    fig.update_yaxes(ticksuffix="  ")
+    return fig
+
+
 @st.cache_data(show_spinner=False)
 def _team_season(team: str, season: int) -> pd.DataFrame:
     return db.query(
@@ -110,9 +146,19 @@ def boardroom_tab() -> None:
     prem = _champion_premium()
     col1, col2 = st.columns([3, 2])
     with col1:
-        st.bar_chart(prem.set_index("pos_group")["premium"], height=380)
+        st.plotly_chart(_premium_fig(prem), use_container_width=True)
     with col2:
-        st.dataframe(_verdict(), hide_index=True, height=380)
+        vdf = _verdict().copy()
+        if "champion_premium" in vdf:
+            vdf["champion_premium"] = vdf["champion_premium"] * 100
+        st.dataframe(vdf, hide_index=True, height=420, column_config={
+            "pos_group": st.column_config.TextColumn("Pos"),
+            "champion_premium": st.column_config.NumberColumn(
+                "Champ premium", format="%+.2f%%",
+                help="Champion avg cap share minus league average (percentage points)"),
+            "corr_win": st.column_config.NumberColumn("Corr. w/ wins", format="%.3f"),
+            "verdict": st.column_config.TextColumn("Verdict"),
+        })
 
     st.divider()
     st.subheader("Team spending profile")
