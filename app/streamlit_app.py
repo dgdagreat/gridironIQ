@@ -630,8 +630,12 @@ def maxer_tab() -> None:
     st.subheader("League-wide SB outlook")
     lt = league[["rank", "team", "outlook", "roster_readiness", "org_score"]].copy()
     lt.insert(2, "grade", lt["outlook"].map(_grade))
+    if {"wins", "losses", "games"}.issubset(league.columns) and int(league["games"].sum()) > 0:
+        lt.insert(2, "rec", (league["wins"].astype(int).astype(str) + "–"
+                             + league["losses"].astype(int).astype(str)))
     st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320,
                  column_config={
+                     "rec": st.column_config.TextColumn(f"{config.CURRENT_SEASON}"),
                      "outlook": st.column_config.NumberColumn("outlook", format="%.0f"),
                      "roster_readiness": st.column_config.NumberColumn("roster", format="%.0f"),
                      "org_score": st.column_config.NumberColumn("org", format="%.0f"),
