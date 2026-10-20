@@ -546,26 +546,31 @@ def maxer_tab() -> None:
     prev_season = int(meta["roster_season"]) - 1
     prev = _prior_rank(prev_season).get(team)
     cur = rep["rank"]
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("SB outlook", f"{rep['readiness']:.1f}/100")
-    c2.metric("Roster", f"{rep['roster_readiness']:.0f}")
-    c3.metric("Organization", f"{rep['org_score']:.0f}")
+    rec = rep.get("season_record")
+    c2.metric(f"{meta['roster_season']} record",
+              f"{rec['wins']}–{rec['losses']}" if rec else "—",
+              help="This season's results so far — blended into the outlook with a "
+                   "weight that grows as more games are played.")
+    c3.metric("Roster", f"{rep['roster_readiness']:.0f}")
+    c4.metric("Organization", f"{rep['org_score']:.0f}")
     if prev:
         move = prev - cur                                # +ve = climbed the board
         delta = f"{move:+d} vs {prev_season} finish (#{prev})" if move \
             else f"same as {prev_season} finish (#{prev})"
-        c4.metric(f"Predicted rank ({meta['roster_season']})",
+        c5.metric(f"Predicted rank ({meta['roster_season']})",
                   f"#{cur} of {rep['n_teams']}",
                   delta=delta, delta_color=("normal" if move else "off"),
                   help=f"Where the Maxer projects {team} this year vs. where they "
                        f"finished the {prev_season} regular season (#{prev}).")
     else:
-        c4.metric(f"Predicted rank ({meta['roster_season']})",
+        c5.metric(f"Predicted rank ({meta['roster_season']})",
                   f"#{cur} of {rep['n_teams']}")
     st.caption(
         f"Biggest needs: **{', '.join(rep['top_needs']) or '—'}**  ·  "
-        "Outlook = 55% roster talent + 45% organization "
-        "(coaching/GM/ownership proxy via recent franchise success)  ·  "
+        "Outlook = 55% roster talent + 45% organization, with **this season's "
+        "results mixed in** (the weight grows as games are played)  ·  "
         f"rank arrow = projection vs the {prev_season} final standings.")
 
     needs = rep["needs"]

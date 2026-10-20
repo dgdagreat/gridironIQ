@@ -28,7 +28,8 @@ from gridiron.modeling import cap_efficiency, organization
 WEIGHT_FLOOR = 0.30          # no position is worth zero — you can't punt any of them
 BLUEPRINT_BASE = 50.0        # contender baseline percentile at the least-critical spot
 BLUEPRINT_SPAN = 25.0        # extra percentile demanded at the most-critical spot
-ROSTER_WEIGHT = 0.55         # outlook = roster readiness (55%) + organization (45%)
+ROSTER_WEIGHT = 0.55         # pre-season outlook = roster readiness (55%) + organization (45%)
+FORM_WEIGHT_MAX = 0.40       # weight this season's results reach once it's complete (~17 games)
 
 
 def position_weights() -> pd.Series:
@@ -94,10 +95,33 @@ def prior_season_rank(season: int) -> pd.DataFrame:
     return df
 
 
-def league_table(strength: pd.DataFrame) -> pd.DataFrame:
-    """Per-team SB outlook (roster readiness blended with org) + rank.
+def current_form(season: int | None = None) -> pd.DataFrame:
+    """This season's results so far — the in-season signal the outlook blends in.
 
-    Columns: team, roster_readiness, org_score, outlook, rank.
+    A 0–100 ``form_score`` from win percentage, plus ``games`` played (how much to
+    trust it yet). Returns an empty frame before the season has any completed games.
+    Columns: team, wins, losses, win_pct, point_diff, games, form_score.
+    """
+    from gridiron import config
+
+    season = config.CURRENT_SEASON if season is None else season
+    cur = prior_season_rank(season)
+    if cur.empty:
+        return cur
+    cur = cur.assign(games=(cur["wins"] + cur["losses"]).astype(int),
+                     form_score=(100.0 * cur["win_pct"]).round(1))
+    return cur[["team", "wins", "losses", "win_pct", "point_diff",
+                "games", "form_score"]]
+
+
+def league_table(strength: pd.DataFrame) -> pd.DataFrame:
+    """Per-team SB outlook + rank.
+
+    Pre-season the outlook is roster readiness (55%) blended with organization
+    (45%); once the season starts, this year's results are mixed in with a weight
+    that grows with games played (so the rank fluctuates week to week while roster
+    quality still anchors it early). Columns: team, roster_readiness, org_score,
+    form_score, wins, losses, games, outlook, rank.
     """
     weights = position_weights()
     blueprint = champion_blueprint(weights)
@@ -113,8 +137,28 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     org = organization.franchise_strength()[["team", "org_score"]]
     table = table.merge(org, on="team", how="left")
     table["org_score"] = table["org_score"].fillna(50.0)
-    table["outlook"] = (ROSTER_WEIGHT * table["roster_readiness"]
-                        + (1 - ROSTER_WEIGHT) * table["org_score"]).round(1)
+    table["base_outlook"] = (ROSTER_WEIGHT * table["roster_readiness"]
+                             + (1 - ROSTER_WEIGHT) * table["org_score"]).round(1)
+
+    # Mix in this season's results — weight ramps from ~0 at week 1 to
+    # FORM_WEIGHT_MAX over a full 17-game season, so the roster/org projection
+    # still anchors the outlook early while the rank moves as games are played.
+    form = current_form()
+    if not form.empty:
+        table = table.merge(form[["team", "wins", "losses", "games", "form_score"]],
+                            on="team", how="left")
+        for col, dflt in (("wins", 0), ("losses", 0), ("games", 0)):
+            table[col] = table[col].fillna(dflt).astype(int)
+        table["form_score"] = table["form_score"].fillna(table["base_outlook"])
+        w = (table["games"] / 17.0 * FORM_WEIGHT_MAX).clip(upper=FORM_WEIGHT_MAX)
+        table["outlook"] = ((1 - w) * table["base_outlook"]
+                            + w * table["form_score"]).round(1)
+    else:
+        for col in ("wins", "losses", "games"):
+            table[col] = 0
+        table["form_score"] = float("nan")
+        table["outlook"] = table["base_outlook"]
+    table = table.drop(columns="base_outlook")
 
     table = table.sort_values("outlook", ascending=False).reset_index(drop=True)
     table["rank"] = table.index + 1
@@ -143,11 +187,18 @@ def team_report(team: str, strength: pd.DataFrame) -> dict:
     needs["priority"] = (needs["gap"] * needs["weight"]).round(2)
     needs = needs.sort_values("priority", ascending=False, ignore_index=True)
 
+    games = int(row["games"]) if "games" in row.index else 0
+    record = None
+    if games > 0:
+        record = {"wins": int(row["wins"]), "losses": int(row["losses"]),
+                  "win_pct": round(int(row["wins"]) / games, 3)}
     return {
         "team": team,
         "readiness": float(row["outlook"]),          # headline = blended outlook
         "roster_readiness": float(row["roster_readiness"]),
         "org_score": float(row["org_score"]),
+        "season_record": record,                     # this season so far (None pre-season)
+        "games_played": games,
         "rank": int(row["rank"]),
         "n_teams": int(len(table)),
         "needs": needs,
