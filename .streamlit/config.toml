@@ -2,6 +2,14 @@
 
 [theme]
 base = "light"
+# Tie the Streamlit chrome (tabs, buttons, sliders, links) to the app's own
+# palette — field/"A-grade" green — so the UI reads as one designed system
+# instead of green content on default-blue widgets.
+primaryColor = "#1a7f37"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#eef3f0"
+textColor = "#1a1d21"
+font = "sans serif"
 
 [server]
 # Skip the source-file watcher: faster startup, and avoids watcher stalls on
