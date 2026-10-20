@@ -2,6 +2,8 @@
 
 > **In the salary cap era, which positions truly win championships — and are teams paying for it correctly?**
 
+### ▶︎ Live: **[the app](https://gridironiq-nfl.streamlit.app/)** · **[the Tableau dashboard](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)**
+
 GridironIQ is a full-stack NFL analytics platform built around that one question.
 It models three decades of salary-cap data as **share of the cap** (not raw
 dollars), correlates positional spending with Super Bowl outcomes, and uses
@@ -84,7 +86,7 @@ ingestion ─┤
 - **Validating the validator** — the eval harness first scored 70%, but every miss was a *scorer* bug (Unicode-minus read as positive, "49ers" parsed as 49). Fixing the **scorer**, not the agent, took it to 95–100%; the gate then runs fully offline in CI.
 
 📐 Full write-up: **[ARCHITECTURE.md](ARCHITECTURE.md)**  ·  Databricks runbook: **[DATABRICKS.md](DATABRICKS.md)**  ·  dashboard build: **[tableau/](tableau/)**
-🔗 **Live Tableau dashboard → [public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)**
+🔗 **Live app → [gridironiq-nfl.streamlit.app](https://gridironiq-nfl.streamlit.app/)**  ·  **Live Tableau dashboard → [GridironIQ — NFL Roster Construction](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)**
 
 ---
 
@@ -349,7 +351,7 @@ so it never offers a player who's already signed.
 | **Platform — eval harness + offline CI gate** | ✅ 95–100% (no warehouse / API key needed) |
 | **Platform — Docker image + GitHub Actions CI** | ✅ builds + runs green in-container |
 | **Platform — Tableau Public dashboard** | ✅ **[live](https://public.tableau.com/app/profile/daejuan.graham/viz/GridironIQNFLRosterConstruction/Dashboard1)** |
-| Streamlit app (3 tabs) | ✅ Boardroom + Maxer live; Film Room wired |
+| Streamlit app (4 tabs) | ✅ **[live](https://gridironiq-nfl.streamlit.app/)** — Boardroom, Value Board, Maxer; Film Room needs a key |
 | Charting metrics (separation, YACO) | 🟡 scaffolded (NGS/PFR pass) |
 | React frontend | 📋 planned ([frontend/README.md](frontend/README.md)) |
 
