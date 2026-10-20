@@ -42,9 +42,10 @@ AGE_CURVE: dict[str, tuple[float, float, float]] = {
 }
 _DEFAULT_CURVE = (29, 0.040, 0.55)
 
-# --- Production trend: reward ascending players, mark down decliners. ----------
+# --- Production trend: reward ascending players, only lightly mark down
+# decliners (AV is noisy year to year; a small dip shouldn't tank a star). ------
 TREND_SENSITIVITY = 0.5
-TREND_MIN, TREND_MAX = 0.80, 1.15
+TREND_MIN, TREND_MAX = 0.97, 1.15
 
 
 def age_factor(pos_group: str, age: float | None) -> float:
@@ -108,11 +109,13 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
     df["madden_ovr_pct"] = df.groupby("pos_group")["madden_ovr"].rank(pct=True)
     df["last_av_pct"] = df.groupby("pos_group")["last_av_eff"].rank(pct=True)
 
-    # Static talent = blend of external grade + production (percentile within pos).
-    df["talent_static"] = (
-        df[["madden_ovr_pct", "last_av_pct"]].mean(axis=1, skipna=True)
-        .fillna(UNRATED_TALENT)
-    )
+    # Static talent = external grade (Madden) weighted over production (AV).
+    # Madden leads because AV is a noisy, team-dependent counting stat that
+    # compresses elite players; AV still informs grades where Madden is
+    # missing or soft. Fall back to whichever signal exists.
+    _m, _a = df["madden_ovr_pct"], df["last_av_pct"]
+    df["talent_static"] = ((0.8 * _m + 0.2 * _a)
+                           .fillna(_m).fillna(_a).fillna(UNRATED_TALENT))
     # Adjust the static grade for age and production trend — a rating isn't gospel.
     df["age_factor"] = [age_factor(p, a) for p, a in zip(df["pos_group"], df["age"])]
     df["trend_factor"] = [
@@ -137,10 +140,16 @@ def compute_unit_strength(players: pd.DataFrame) -> pd.DataFrame:
     for (team, pos), grp in scored.groupby(["team", "pos_group"]):
         k = UNIT_SIZE.get(pos, 3)
         top = grp.nlargest(k, "talent")
+        t = top["talent"]
+        # Star-weighted: the best player carries the unit (an elite anchor like a
+        # top QB or interior lineman shouldn't grade out poorly just because the
+        # depth behind him is thin), tempered by the quality of that depth.
+        unit = (0.75 * float(t.iloc[0]) + 0.25 * float(t.mean())
+                if len(t) else UNRATED_TALENT)
         rows.append({
             "team": team,
             "pos_group": pos,
-            "unit_score": round(float(top["talent"].mean()), 4),
+            "unit_score": round(unit, 4),
             "n_players": int(len(grp)),
             "top_player": top.iloc[0]["player"] if len(top) else None,
         })
