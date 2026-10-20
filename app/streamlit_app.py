@@ -374,21 +374,29 @@ _FORMATION: list[tuple[str, str, float, float, str | None]] = [
 def _assign_starters(team: str, players: pd.DataFrame | None) -> list[dict | None]:
     """Fill each formation slot with this team's likely starter there.
 
-    Starters are ranked by **Madden overall** — who actually plays — not the
-    age/trend-adjusted ``talent`` (which would bench an aging star behind a
-    younger backup). Granular ``depth_chart_position`` pins players to the right
-    slot (a 'T' at tackle, 'FS'/'SS' at safety); anything without a bucket fills by
-    grade, so the nickel back is the 3rd corner and the slot is the 3rd receiver.
-    The formation is walked in order, consuming players so nobody starts twice.
+    Players ruled out right now (injured / IR / inactive, ``currently_out``) sort
+    to the back, so each slot shows whoever **actually suits up** — the next man up
+    when the nominal starter is hurt. The rest are ranked by current depth-chart
+    standing (``depth_rank``), then Madden overall. Granular ``depth_chart_position``
+    pins players to the right slot (a 'T' at tackle, 'FS'/'SS' at safety); anything
+    without a bucket fills by order, so the nickel back is the 3rd corner and the
+    slot is the 3rd receiver. The formation is walked in order, consuming players
+    so nobody starts twice.
     """
     if players is None or players.empty:
         return [None] * len(_FORMATION)
-    tp = players[players["team"] == team]
+    tp = players[players["team"] == team].copy()
+    tp["_out"] = (tp["currently_out"].fillna(False).astype(bool)
+                  if "currently_out" in tp.columns else False)
+    sort_cols, asc = ["_out"], [True]
+    if "depth_rank" in tp.columns:
+        sort_cols.append("depth_rank"); asc.append(True)
+    sort_cols += ["madden_ovr", "talent"]; asc += [False, False]
     used: set = set()
     out: list[dict | None] = []
     for _role, grp, _x, _y, bucket in _FORMATION:
-        pool = tp[tp["pos_group"] == grp].sort_values(
-            ["madden_ovr", "talent"], ascending=False, na_position="last")
+        pool = tp[tp["pos_group"] == grp].sort_values(sort_cols, ascending=asc,
+                                                       na_position="last")
         buckets = ([pool[pool["depth_chart_position"] == bucket]] if bucket else []) + [pool]
         pick = None
         for cand in buckets:                       # granular slot first, then the group
@@ -404,7 +412,9 @@ def _assign_starters(team: str, players: pd.DataFrame | None) -> list[dict | Non
         used.add(pick["gsis_id"])
         out.append({"player": pick["player"], "ovr": pick.get("madden_ovr"),
                     "age": pick.get("age"), "dcp": pick.get("depth_chart_position"),
-                    "injured": bool(pick.get("injured_last"))})
+                    "injured": bool(pick.get("injured_last")),
+                    "out_now": bool(pick.get("_out")),
+                    "status": pick.get("injury_status")})
     return out
 
 
@@ -449,7 +459,13 @@ def _field_figure(team: str, strength: pd.DataFrame,
                 ovr = f"Madden {who['ovr']:.0f}" if pd.notna(who["ovr"]) else "unrated"
                 age = f"{who['age']:.0f}" if pd.notna(who["age"]) else "—"
                 dcp = who["dcp"] or grp
-                inj = " · 🩹 credited back from injury" if who.get("injured") else ""
+                if who.get("out_now"):
+                    status = who.get("status")
+                    inj = f" · 🚑 {status if isinstance(status, str) else 'OUT'}"
+                elif who.get("injured"):
+                    inj = " · 🩹 credited back from injury"
+                else:
+                    inj = ""
                 hovers.append(f"<b>{who['player']}</b> · {label} ({dcp}){inj}<br>"
                               f"{ovr} · age {age}<br>"
                               f"{grp} unit: grade {g} · #{rk} of {n} in the NFL")
@@ -526,9 +542,12 @@ def maxer_tab() -> None:
     meta = _maxer_meta()
     st.subheader("How far is each team from a champion-caliber roster?")
     st.caption(
-        f"Current rosters scored on **production + external grade, adjusted for "
-        f"age and recent production trend** (a static rating isn't gospel), measured "
-        f"against a champion blueprint weighted by the Boardroom's title-importance. "
+        f"Grades blend **preseason caliber** (Madden + production, age-adjusted) with "
+        f"**live {meta.get('perf_season', meta['roster_season'])} performance** — "
+        f"weighted more as games are played and projected to a full-season pace. "
+        f"Players **out / on IR right now are set aside**, so each unit reflects who "
+        f"actually suits up. Measured against a champion blueprint weighted by the "
+        f"Boardroom's title-importance. "
         f"Roster: {meta['roster_season']} · grades: Madden {meta['madden_season']} · "
         f"**data as of {meta['data_as_of']}**"
     )

@@ -40,6 +40,11 @@ WEEKLY_STATS_URL = (config.NFLVERSE_RELEASE_BASE
                     + "/stats_player/stats_player_week_{season}.parquet")
 #: nflverse depth charts — timestamped snapshots; the latest defines who starts.
 DEPTH_URL = config.NFLVERSE_RELEASE_BASE + "/depth_charts/depth_charts_{season}.parquet"
+#: nflverse weekly injury report (who's Out/Doubtful/Questionable each week).
+INJURY_URL = config.NFLVERSE_RELEASE_BASE + "/injuries/injuries_{season}.parquet"
+#: nflverse weekly rosters — per-week active/IR/PUP status for every player.
+WEEKLY_ROSTER_URL = (config.NFLVERSE_RELEASE_BASE
+                     + "/weekly_rosters/roster_weekly_{season}.parquet")
 DEFAULT_TTL_HOURS = 24
 
 
@@ -272,6 +277,10 @@ def player_performance(season: int, pos_by_gsis: pd.DataFrame,
                                             **_WEEKLY_SUMS, **_WEEKLY_MEANS}))
 
     # Snaps + games actually played (any snap counts), keyed by gsis via crosswalk.
+    # ``recent_snaps`` (the last two played weeks) separates players still on the
+    # field now from those who've stopped playing (injury/benching) even if their
+    # season total looks healthy — the "who actually plays" signal.
+    cols = ["gsis_id", "snaps_2026", "games_snap", "recent_snaps", "last_played_week"]
     try:
         snaps = load_snap_counts(season, force=force)
         reg_s = snaps[snaps.get("game_type", pd.Series("REG", index=snaps.index)).eq("REG")]
@@ -279,19 +288,95 @@ def player_performance(season: int, pos_by_gsis: pd.DataFrame,
                  .drop_duplicates("pfr_id"))
         reg_s = reg_s.merge(xwalk, left_on="pfr_player_id", right_on="pfr_id", how="inner")
         reg_s["snaps"] = reg_s[["offense_snaps", "defense_snaps"]].fillna(0).sum(axis=1)
+        reg_s["played"] = reg_s["snaps"] > 0
+        max_wk = int(reg_s["week"].max()) if len(reg_s) else 0
+        recent = reg_s[reg_s["week"] >= max_wk - 1]
         snp = (reg_s.groupby("gsis_id")
                .agg(snaps_2026=("snaps", "sum"), games_snap=("game_id", "nunique"))
                .reset_index())
+        snp = snp.merge(recent.groupby("gsis_id")["snaps"].sum()
+                        .rename("recent_snaps").reset_index(), on="gsis_id", how="left")
+        snp = snp.merge(reg_s[reg_s["played"]].groupby("gsis_id")["week"].max()
+                        .rename("last_played_week").reset_index(), on="gsis_id", how="left")
     except requests.RequestException:  # pragma: no cover - season not posted yet
-        snp = pd.DataFrame(columns=["gsis_id", "snaps_2026", "games_snap"])
+        snp = pd.DataFrame(columns=cols)
 
     out = stats.merge(snp, on="gsis_id", how="outer")
     out = out.merge(pos_by_gsis[["gsis_id", "pos_group"]].drop_duplicates("gsis_id"),
                     on="gsis_id", how="left")
     out["games_2026"] = out[["games_wk", "games_snap"]].max(axis=1).fillna(0)
     out["snaps_2026"] = pd.to_numeric(out["snaps_2026"], errors="coerce").fillna(0)
+    out["recent_snaps"] = pd.to_numeric(out["recent_snaps"], errors="coerce").fillna(0)
     out["perf_raw"] = _performance_composite(out)
-    return out[["gsis_id", "perf_raw", "games_2026", "snaps_2026"]]
+    return out[["gsis_id", "perf_raw", "games_2026", "snaps_2026",
+                "recent_snaps", "last_played_week"]]
+
+
+# --------------------------------------------------------------------------- #
+# Availability: who is hurt / inactive right now
+# --------------------------------------------------------------------------- #
+#: Weekly-roster status values that mean a player IS available to play now.
+#: Anything else (RES/IR, PUP, DEV practice squad, INA inactive, CUT, …) is out.
+_ACTIVE_ROSTER_STATUS = {"ACT", "A01"}
+#: Injury-report game designations that mean a player won't suit up this week.
+_OUT_REPORT_STATUS = {"Out", "Doubtful"}
+
+
+def player_availability(season: int, *, ttl_hours: float = DEFAULT_TTL_HOURS,
+                        force: bool = False) -> pd.DataFrame:
+    """Current injury / inactive status per player → who actually suits up.
+
+    Combines the two feeds that say a player won't play right now:
+      * the **weekly roster** — the latest week's roster designation (IR, PUP,
+        practice squad, inactive, … vs. active), the structural "not available"
+        signal;
+      * the **injury report** — the latest week's game status (Out / Doubtful),
+        for players still on the active roster but ruled out this week.
+
+    Returns ``gsis_id, injury_status`` (a short label, ``None`` if healthy) and
+    ``currently_out`` (bool). Empty (→ everyone treated available) if the feeds
+    aren't posted yet.
+    """
+    status = pd.Series(dtype="object", name="roster_status")
+    try:
+        path = _cached_download(WEEKLY_ROSTER_URL.format(season=season),
+                                config.RAW_DIR / f"roster_weekly_{season}.parquet",
+                                ttl_hours, force)
+        wr = pd.read_parquet(path, columns=["week", "gsis_id", "status"])
+        wr = wr.dropna(subset=["gsis_id"])
+        wr = wr[wr["week"] == wr["week"].max()]
+        status = wr.drop_duplicates("gsis_id").set_index("gsis_id")["status"]
+    except requests.RequestException:  # pragma: no cover - not posted yet
+        pass
+
+    report = pd.Series(dtype="object", name="report_status")
+    try:
+        path = _cached_download(INJURY_URL.format(season=season),
+                                config.RAW_DIR / f"injuries_{season}.parquet",
+                                ttl_hours, force)
+        inj = pd.read_parquet(path, columns=["week", "gsis_id", "report_status"])
+        inj = inj.dropna(subset=["gsis_id"])
+        inj = inj[inj["week"] == inj["week"].max()]
+        report = inj.drop_duplicates("gsis_id").set_index("gsis_id")["report_status"]
+    except requests.RequestException:  # pragma: no cover - not posted yet
+        pass
+
+    ids = status.index.union(report.index)
+    if ids.empty:
+        return pd.DataFrame(columns=["gsis_id", "injury_status", "currently_out"])
+    df = pd.DataFrame(index=ids)
+    df["roster_status"] = status.reindex(ids)
+    df["report_status"] = report.reindex(ids)
+
+    off_roster = df["roster_status"].notna() & ~df["roster_status"].isin(_ACTIVE_ROSTER_STATUS)
+    ruled_out = df["report_status"].isin(_OUT_REPORT_STATUS)
+    df["currently_out"] = off_roster | ruled_out
+    # Short display label, most severe last-wins.
+    df["injury_status"] = None
+    df.loc[df["report_status"].eq("Questionable"), "injury_status"] = "Q"
+    df.loc[off_roster, "injury_status"] = df.loc[off_roster, "roster_status"]
+    df.loc[ruled_out, "injury_status"] = df.loc[ruled_out, "report_status"]
+    return df.reset_index(names="gsis_id")[["gsis_id", "injury_status", "currently_out"]]
 
 
 # --------------------------------------------------------------------------- #
@@ -373,10 +458,16 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     perf = player_performance(roster_season, players[["gsis_id", "pos_group"]],
                               xwalk, force=force)
     players = players.merge(perf, on="gsis_id", how="left")
-    for col in ("games_2026", "snaps_2026"):
+    for col in ("games_2026", "snaps_2026", "recent_snaps"):
         players[col] = pd.to_numeric(players[col], errors="coerce").fillna(0)
     players["depth_rank"] = players["gsis_id"].map(
         load_depth_charts(roster_season, force=force))
+
+    # Current injury / inactive status — so a player who's Out or on IR isn't
+    # graded as a starter, and the unit reflects whoever actually suits up.
+    avail = player_availability(roster_season, force=force)
+    players = players.merge(avail, on="gsis_id", how="left")
+    players["currently_out"] = players["currently_out"].fillna(False).astype(bool)
 
     players = players[players["pos_group"].ne("UNK") & players["team"].notna()]
 
@@ -394,6 +485,7 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
             (pd.to_numeric(players["games_av0"], errors="coerce") < 8).sum()),
         "n_perf": int(perf_qual.sum()),
         "n_starters": int((players["depth_rank"] == 1).sum()),
+        "n_out": int(players["currently_out"].sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta

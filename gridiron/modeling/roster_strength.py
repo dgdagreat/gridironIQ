@@ -71,6 +71,10 @@ PERF_RAMP_GAMES = 8.0       # games by which the production blend reaches its ma
 PERF_WEIGHT_MAX = 0.35      # most weight the in-season production blend ever carries
 PERF_MIN_GAMES = 2          # games needed before a production percentile is trusted
 PERF_MIN_SNAPS = 40         # snaps needed before a production percentile is trusted
+#: Projection shrinkage: a short sample is regressed toward the position's typical
+#: production (weight g/(g+k)), so an in-season grade reflects what a player is on
+#: *pace* to do over a full season, not an unsustainable two-game hot (or cold) run.
+PROJ_SHRINK_GAMES = 3.0
 
 #: Star weight for a unit: how much the single best starter carries it vs. the
 #: depth behind him. An elite anchor (a top QB, a disruptive interior lineman)
@@ -135,9 +139,11 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
     """
     df = players.copy()
     for col in ("madden_ovr", "last_av", "age", "av0", "av1", "av2", "games_av0",
-                "perf_raw", "games_2026", "snaps_2026"):
+                "perf_raw", "games_2026", "snaps_2026", "recent_snaps"):
         if col not in df:
             df[col] = pd.NA
+    if "currently_out" not in df:
+        df["currently_out"] = False
 
     # Injury guard: a low games total in the AV's own season means missed time.
     gp = pd.to_numeric(df["games_av0"], errors="coerce")
@@ -182,11 +188,16 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
     trend_eff = df["trend_factor"] + rel * (1.0 - df["trend_factor"])
     df["talent_base"] = (df["talent_static"] * age_eff * trend_eff).clip(0, 1)
 
-    # 2) In-season production percentile within position (gated to real samples).
+    # 2) In-season production percentile within position (gated to real samples),
+    #    projected: a short sample is regressed toward the position's typical
+    #    production so the grade tracks a full-season pace, not a two-game spike.
     qualified = (games >= PERF_MIN_GAMES) & (snaps >= PERF_MIN_SNAPS) \
         & pd.to_numeric(df["perf_raw"], errors="coerce").notna()
     perf = pd.to_numeric(df["perf_raw"], errors="coerce").where(qualified)
-    df["perf_pct"] = df.assign(_perf=perf).groupby("pos_group")["_perf"].rank(pct=True)
+    base_rate = perf.groupby(df["pos_group"]).transform("median")
+    shrink = games / (games + PROJ_SHRINK_GAMES)
+    perf_proj = (shrink * perf + (1 - shrink) * base_rate).where(qualified)
+    df["perf_pct"] = df.assign(_perf=perf_proj).groupby("pos_group")["_perf"].rank(pct=True)
 
     # Lift-biased blend: production can only raise a grade above its projection
     # (max(base, perf_pct)); a quiet box score falls back to the projection.
@@ -200,25 +211,33 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
 def compute_unit_strength(players: pd.DataFrame) -> pd.DataFrame:
     """Aggregate to one row per team × position group with a 0–100 strength.
 
-    The unit is the team's **actual starters** at a position: players are ordered
-    by current depth-chart standing (``depth_rank`` from the live depth chart, 1 =
+    The unit is the team's **actual starters** at a position: players ruled out
+    right now (injured / IR / inactive) are set aside, and the rest are ordered by
+    current depth-chart standing (``depth_rank`` from the live depth chart, 1 =
     starter), with talent as the tiebreak and the fallback where no depth-chart
-    rank exists. That keeps the grade tied to who really plays, not merely to who
-    has the highest rating on the roster.
+    rank exists. So a hurt star doesn't prop up a unit he isn't playing in — the
+    next man up carries it, and the grade drops to match — while who's healthy and
+    actually on the field defines the rest.
 
     Columns: team, pos_group, unit_score (raw starter quality), strength
     (percentile vs. the league), n_players, top_player.
     """
     scored = player_talent_scores(players)
-    if "depth_rank" not in scored:
-        scored["depth_rank"] = pd.NA
+    for col, dflt in (("depth_rank", pd.NA), ("currently_out", False)):
+        if col not in scored:
+            scored[col] = dflt
+    out_now = scored["currently_out"].fillna(False).astype(bool)
 
     rows: list[dict] = []
     for (team, pos), grp in scored.groupby(["team", "pos_group"]):
         k = UNIT_SIZE.get(pos, 3)
+        # Drop players ruled out now; if that empties the group (bad data / a whole
+        # unit on the report), fall back to everyone so a team never grades as 0.
+        avail = grp[~out_now.loc[grp.index]]
+        pool = avail if not avail.empty else grp
         # Starters first (lowest depth rank), best talent breaking ties / filling.
-        top = grp.sort_values(["depth_rank", "talent"], ascending=[True, False],
-                              na_position="last").head(k)
+        top = pool.sort_values(["depth_rank", "talent"], ascending=[True, False],
+                               na_position="last").head(k)
         t = top["talent"].sort_values(ascending=False)
         # Star-weighted: the best starter carries the unit (an elite anchor like a
         # top QB or interior lineman shouldn't grade out poorly just because the
@@ -229,7 +248,7 @@ def compute_unit_strength(players: pd.DataFrame) -> pd.DataFrame:
             "team": team,
             "pos_group": pos,
             "unit_score": round(unit, 4),
-            "n_players": int(len(grp)),
+            "n_players": int(len(pool)),
             "top_player": top.loc[top["talent"].idxmax(), "player"] if len(top) else None,
         })
     units = pd.DataFrame(rows)
