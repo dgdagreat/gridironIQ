@@ -29,7 +29,8 @@ WEIGHT_FLOOR = 0.30          # no position is worth zero — you can't punt any 
 BLUEPRINT_BASE = 50.0        # contender baseline percentile at the least-critical spot
 BLUEPRINT_SPAN = 25.0        # extra percentile demanded at the most-critical spot
 ROSTER_WEIGHT = 0.55         # pre-season outlook = roster readiness (55%) + organization (45%)
-FORM_WEIGHT_MAX = 0.40       # weight this season's results reach once it's complete (~17 games)
+FORM_WEIGHT_MAX = 0.65       # weight this season's results carry once it's the dominant signal
+FORM_RAMP_GAMES = 10         # games by which the in-season weight reaches FORM_WEIGHT_MAX
 
 
 def position_weights() -> pd.Series:
@@ -150,7 +151,7 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
         for col, dflt in (("wins", 0), ("losses", 0), ("games", 0)):
             table[col] = table[col].fillna(dflt).astype(int)
         table["form_score"] = table["form_score"].fillna(table["base_outlook"])
-        w = (table["games"] / 17.0 * FORM_WEIGHT_MAX).clip(upper=FORM_WEIGHT_MAX)
+        w = (table["games"] / FORM_RAMP_GAMES).clip(upper=1.0) * FORM_WEIGHT_MAX
         table["outlook"] = ((1 - w) * table["base_outlook"]
                             + w * table["form_score"]).round(1)
     else:

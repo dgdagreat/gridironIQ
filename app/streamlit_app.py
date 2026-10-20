@@ -169,7 +169,15 @@ def boardroom_tab() -> None:
     c1, c2 = st.columns(2)
     team = c1.selectbox("Team", teams, key="br_team",
                         index=teams.index("KC") if "KC" in teams else 0)
-    _def_season = config.CURRENT_SEASON if config.CURRENT_SEASON in seasons else seasons[0]
+    # Default to the latest season with on-field results (EPA) so both the
+    # spending chart and the "did it translate?" EPA panel populate on open;
+    # the current year only has committed-money projections and no results yet.
+    _epa_seasons = (sorted(db.query("SELECT DISTINCT season FROM pbp_team_season_epa")["season"])
+                    if db.table_exists("pbp_team_season_epa") else [])
+    _complete = [s for s in _epa_seasons if s in seasons]
+    _def_season = (max(_complete) if _complete
+                   else config.CURRENT_SEASON if config.CURRENT_SEASON in seasons
+                   else seasons[0])
     season = c2.selectbox("Season", seasons, index=seasons.index(_def_season),
                           key="br_season")
     if season > config.CURRENT_SEASON:
@@ -211,7 +219,11 @@ def boardroom_tab() -> None:
     success, profiles = _archetypes(k)
     st.caption("Each team-season clustered by its positional spending; archetypes "
                "labeled by their most *distinctive* investments and scored by title rate.")
-    st.dataframe(success, hide_index=True)
+    st.dataframe(success, hide_index=True, column_config={
+        "n_team_seasons": st.column_config.NumberColumn("team-seasons"),
+        "sb_appearance_rate": st.column_config.NumberColumn("SB appearance", format="percent"),
+        "sb_win_rate": st.column_config.NumberColumn("SB win", format="percent"),
+    })
     with st.expander("Archetype spending profiles"):
         st.dataframe(profiles, hide_index=True)
 
@@ -569,8 +581,8 @@ def maxer_tab() -> None:
                   f"#{cur} of {rep['n_teams']}")
     st.caption(
         f"Biggest needs: **{', '.join(rep['top_needs']) or '—'}**  ·  "
-        "Outlook = 55% roster talent + 45% organization, with **this season's "
-        "results mixed in** (the weight grows as games are played)  ·  "
+        "Outlook = roster talent + organization pre-season, then **increasingly "
+        "driven by this season's results** (up to 65% by ~week 10)  ·  "
         f"rank arrow = projection vs the {prev_season} final standings.")
 
     needs = rep["needs"]
