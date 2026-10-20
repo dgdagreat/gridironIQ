@@ -35,6 +35,11 @@ ROSTER_URL = config.NFLVERSE_RELEASE_BASE + "/rosters/roster_{season}.parquet"
 MADDEN_URL = ("https://raw.githubusercontent.com/theedgepredictor/"
               "nfl-madden-data/main/data/madden/dataset/{season}.parquet")
 SNAP_URL = config.NFLVERSE_RELEASE_BASE + "/snap_counts/snap_counts_{season}.parquet"
+#: nflverse weekly player box score (gsis-keyed) — the in-season production feed.
+WEEKLY_STATS_URL = (config.NFLVERSE_RELEASE_BASE
+                    + "/stats_player/stats_player_week_{season}.parquet")
+#: nflverse depth charts — timestamped snapshots; the latest defines who starts.
+DEPTH_URL = config.NFLVERSE_RELEASE_BASE + "/depth_charts/depth_charts_{season}.parquet"
 DEFAULT_TTL_HOURS = 24
 
 
@@ -158,6 +163,138 @@ def games_played(season: int, id_crosswalk: pd.DataFrame, *,
 
 
 # --------------------------------------------------------------------------- #
+# In-season (current-year) performance signal
+# --------------------------------------------------------------------------- #
+def load_weekly_stats(season: int, *, ttl_hours: float = DEFAULT_TTL_HOURS,
+                      force: bool = False) -> pd.DataFrame:
+    """nflverse weekly player box score for ``season`` (gsis-keyed, all positions)."""
+    path = _cached_download(WEEKLY_STATS_URL.format(season=season),
+                            config.RAW_DIR / f"stats_player_week_{season}.parquet",
+                            ttl_hours, force)
+    return pd.read_parquet(path)
+
+
+def load_depth_charts(season: int, *, ttl_hours: float = DEFAULT_TTL_HOURS,
+                      force: bool = False) -> pd.Series:
+    """Current depth-chart rank per player (``gsis_id`` → best ``pos_rank``).
+
+    nflverse publishes depth charts as timestamped snapshots; only the **latest**
+    ``dt`` reflects today's lineup (trades/injuries resolved), so we keep that one.
+    ``pos_rank`` is 1 for a starter at a slot, 2 for the backup, etc.; a player's
+    *best* (minimum) rank across formations is his standing. Special-teams rows are
+    dropped so a kick returner isn't mistaken for a starter at his base position.
+    Returns an empty series if the season isn't posted yet.
+    """
+    try:
+        path = _cached_download(DEPTH_URL.format(season=season),
+                                config.RAW_DIR / f"depth_charts_{season}.parquet",
+                                ttl_hours, force)
+    except requests.RequestException:  # pragma: no cover - season not posted yet
+        return pd.Series(dtype="float64", name="depth_rank")
+    dc = pd.read_parquet(path)
+    if "dt" not in dc.columns or dc.empty:
+        return pd.Series(dtype="float64", name="depth_rank")
+    latest = dc[dc["dt"] == dc["dt"].max()]
+    if "pos_grp" in latest.columns:
+        latest = latest[~latest["pos_grp"].eq("Special Teams")]
+    latest = latest.dropna(subset=["gsis_id"])
+    return latest.groupby("gsis_id")["pos_rank"].min().rename("depth_rank")
+
+
+#: Position-appropriate per-game production. Each position is scored on the
+#: box-score signals that actually capture its value, so the number is only
+#: comparable *within* a position group (percentile-ranked downstream). OL and
+#: specialists have no box-score production here and stay NaN (they fall back to
+#: the static grade + depth-chart standing).
+def _performance_composite(df: pd.DataFrame) -> pd.Series:
+    """Per-game production score per player, position-appropriate (NaN if n/a)."""
+    g = df["games_2026"].clip(lower=1)
+    out = pd.Series(float("nan"), index=df.index, dtype="float64")
+    p = df["pos_group"]
+    f = lambda c: pd.to_numeric(df.get(c), errors="coerce").fillna(0.0)
+    pass_epa, rush_epa, rec_epa = f("pass_epa"), f("rush_epa"), f("rec_epa")
+    rec_yds, rush_yds = f("rec_yds"), f("rush_yds")
+    tgt_share, cpoe = f("tgt_share"), f("cpoe")
+    sacks, qbh, tfl = f("sacks"), f("qbh"), f("tfl")
+    tkl, ast = f("tkl"), f("ast")
+    ints, pdef = f("ints"), f("pdef")
+    tackles = tkl + 0.5 * ast
+    pass_rush = sacks + 0.4 * qbh + 0.4 * tfl
+
+    out[p.eq("QB")] = ((pass_epa + 0.6 * rush_epa) / g + 2.0 * cpoe)[p.eq("QB")]
+    out[p.eq("RB")] = ((rush_epa + rec_epa) / g
+                       + 0.0015 * (rush_yds + rec_yds) / g)[p.eq("RB")]
+    wrte = p.isin(["WR", "TE"])
+    out[wrte] = (rec_epa / g + 0.012 * rec_yds / g + 8.0 * tgt_share)[wrte]
+    dl = p.isin(["EDGE", "IDL"])
+    out[dl] = ((pass_rush + 0.1 * tackles) / g)[dl]
+    out[p.eq("LB")] = ((0.2 * tackles + 0.8 * sacks + 0.4 * tfl
+                        + 0.5 * pdef + 1.0 * ints) / g)[p.eq("LB")]
+    db = p.isin(["CB", "S"])
+    out[db] = ((1.2 * ints + 0.6 * pdef + 0.08 * tackles) / g)[db]
+    return out
+
+
+#: Weekly columns we sum (or average) per player into a season-to-date line.
+_WEEKLY_SUMS = {
+    "passing_epa": "pass_epa", "rushing_epa": "rush_epa", "receiving_epa": "rec_epa",
+    "receiving_yards": "rec_yds", "rushing_yards": "rush_yds",
+    "def_sacks": "sacks", "def_qb_hits": "qbh", "def_tackles_for_loss": "tfl",
+    "def_tackles_solo": "tkl", "def_tackle_assists": "ast",
+    "def_interceptions": "ints", "def_pass_defended": "pdef",
+}
+_WEEKLY_MEANS = {"target_share": "tgt_share", "passing_cpoe": "cpoe"}
+
+
+def player_performance(season: int, pos_by_gsis: pd.DataFrame,
+                       id_crosswalk: pd.DataFrame, *, force: bool = False
+                       ) -> pd.DataFrame:
+    """Current-season production per player → ``gsis_id, perf_raw, games_2026, snaps_2026``.
+
+    Aggregates the weekly box score into a season-to-date line, counts games and
+    snaps actually played, and scores each player on a position-appropriate
+    per-game composite (:func:`_performance_composite`). ``pos_by_gsis`` supplies
+    the authoritative roster position group (the weekly feed's own position label
+    is unreliable — e.g. an interior lineman tagged "DE"). Returns an empty frame
+    if the season's weekly feed isn't posted yet, so the caller falls back to the
+    static grades cleanly.
+    """
+    try:
+        weekly = load_weekly_stats(season, force=force)
+    except requests.RequestException:  # pragma: no cover - season not posted yet
+        return pd.DataFrame(columns=["gsis_id", "perf_raw", "games_2026", "snaps_2026"])
+    reg = weekly[weekly.get("season_type", pd.Series("REG", index=weekly.index)).eq("REG")]
+
+    agg = {src: (src, "sum") for src in _WEEKLY_SUMS}
+    agg.update({src: (src, "mean") for src in _WEEKLY_MEANS})
+    stats = (reg.groupby("player_id").agg(games_wk=("week", "nunique"), **agg)
+             .reset_index().rename(columns={"player_id": "gsis_id",
+                                            **_WEEKLY_SUMS, **_WEEKLY_MEANS}))
+
+    # Snaps + games actually played (any snap counts), keyed by gsis via crosswalk.
+    try:
+        snaps = load_snap_counts(season, force=force)
+        reg_s = snaps[snaps.get("game_type", pd.Series("REG", index=snaps.index)).eq("REG")]
+        xwalk = (id_crosswalk.dropna(subset=["pfr_id", "gsis_id"])
+                 .drop_duplicates("pfr_id"))
+        reg_s = reg_s.merge(xwalk, left_on="pfr_player_id", right_on="pfr_id", how="inner")
+        reg_s["snaps"] = reg_s[["offense_snaps", "defense_snaps"]].fillna(0).sum(axis=1)
+        snp = (reg_s.groupby("gsis_id")
+               .agg(snaps_2026=("snaps", "sum"), games_snap=("game_id", "nunique"))
+               .reset_index())
+    except requests.RequestException:  # pragma: no cover - season not posted yet
+        snp = pd.DataFrame(columns=["gsis_id", "snaps_2026", "games_snap"])
+
+    out = stats.merge(snp, on="gsis_id", how="outer")
+    out = out.merge(pos_by_gsis[["gsis_id", "pos_group"]].drop_duplicates("gsis_id"),
+                    on="gsis_id", how="left")
+    out["games_2026"] = out[["games_wk", "games_snap"]].max(axis=1).fillna(0)
+    out["snaps_2026"] = pd.to_numeric(out["snaps_2026"], errors="coerce").fillna(0)
+    out["perf_raw"] = _performance_composite(out)
+    return out[["gsis_id", "perf_raw", "games_2026", "snaps_2026"]]
+
+
+# --------------------------------------------------------------------------- #
 # Join: who is on the roster now × how good they are
 # --------------------------------------------------------------------------- #
 def build_player_talent(season: int | None = None, *, force: bool = False,
@@ -228,18 +365,35 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     else:
         players["games_av0"] = pd.NA
 
+    # Current-season (in-season) production + who is actually starting right now.
+    # These drive the live performance blend in roster_strength: a player
+    # dominating this year climbs regardless of age/Madden, and the units are
+    # built from the real depth-chart starters. Both degrade gracefully to empty
+    # (→ static grades only) before a season is posted.
+    perf = player_performance(roster_season, players[["gsis_id", "pos_group"]],
+                              xwalk, force=force)
+    players = players.merge(perf, on="gsis_id", how="left")
+    for col in ("games_2026", "snaps_2026"):
+        players[col] = pd.to_numeric(players[col], errors="coerce").fillna(0)
+    players["depth_rank"] = players["gsis_id"].map(
+        load_depth_charts(roster_season, force=force))
+
     players = players[players["pos_group"].ne("UNK") & players["team"].notna()]
 
+    perf_qual = (players["games_2026"] >= 2) & players["perf_raw"].notna()
     meta = {
         "roster_season": roster_season,
         "madden_season": madden_season,
         "av0_season": av0_season,
+        "perf_season": roster_season,
         "data_as_of": dt.datetime.now().isoformat(timespec="seconds"),
         "n_players": len(players),
         "n_graded": int(players["madden_ovr"].notna().sum()),
         "n_espn_added": int((players["source"] == "espn").sum()),
         "n_injury_flag": int(
             (pd.to_numeric(players["games_av0"], errors="coerce") < 8).sum()),
+        "n_perf": int(perf_qual.sum()),
+        "n_starters": int((players["depth_rank"] == 1).sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta
