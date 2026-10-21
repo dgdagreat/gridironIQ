@@ -97,7 +97,11 @@ def latest_apy() -> pd.Series:
 # Stage 2 -- explode the nested per-year cap detail
 # --------------------------------------------------------------------------- #
 #: Candidate names for the nested per-season breakdown across source versions.
-_NESTED_COLS = ("cols", "year_details", "season_details")
+#: ``season_history`` is the current nflverse name — a per-year struct list with
+#: ``year``/``team``/``cap_number``/``cap_percent``. It carries each multi-year
+#: deal's full cap schedule, so out-years populate future seasons (committed cap)
+#: — the basis for projecting spending to ``config.PROJECTION_SEASON``.
+_NESTED_COLS = ("season_history", "cols", "year_details", "season_details")
 
 
 def build_player_year_caps(contracts: pd.DataFrame) -> pd.DataFrame:
@@ -128,6 +132,7 @@ def build_player_year_caps(contracts: pd.DataFrame) -> pd.DataFrame:
             continue
         base = {
             "otc_id": getattr(row, "otc_id", None),
+            "gsis_id": getattr(row, "gsis_id", None),
             "player": getattr(row, "player", None),
             "position": getattr(row, "position", None),
             "year_signed": getattr(row, "year_signed", None),
@@ -193,7 +198,7 @@ def _normalize_player_year(df: pd.DataFrame) -> pd.DataFrame:
 
     df = _select_governing_contract(df)
 
-    keep = ["otc_id", "player", "position", "season", "team",
+    keep = ["otc_id", "gsis_id", "player", "position", "season", "team",
             "cap_number", "cap_percent", "year_signed"]
     return df[[c for c in keep if c in df.columns]].reset_index(drop=True)
 
@@ -283,15 +288,21 @@ def build_positional_spending(player_year_caps: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
 
-    # Within-team-season normalized share: each position as a fraction of the
-    # team's *accounted* cap. Controls for the source's lower historical coverage
-    # so distributions stay comparable across eras.
-    team_total = agg.groupby(["season", "team"])["cap_pct"].transform("sum")
-    agg["cap_pct_norm"] = (agg["cap_pct"] / team_total).where(team_total > 0)
-
-    # Cross-check share from dollars / league cap reference table.
+    # Cross-check / fallback share from dollars ÷ the league cap reference table
+    # (config carries projected caps for the out-years too).
     agg["league_cap"] = agg["season"].map(config.LEAGUE_SALARY_CAP)
     agg["cap_pct_ref"] = agg["cap_dollars"] / agg["league_cap"]
+    # The source omits cap_percent in far out-years (no official cap set yet), so
+    # back it with dollars ÷ projected cap — keeps committed future shares real.
+    agg["cap_pct"] = agg["cap_pct"].where(agg["cap_pct"] > 0, agg["cap_pct_ref"])
+
+    # Within-team-season normalized share: each position as a fraction of the
+    # team's *accounted* committed cap. Normalized on dollars (always present, even
+    # in out-years the source leaves cap_percent blank); identical to a
+    # cap_percent-based share in settled years since the league cap is constant
+    # within a season. Controls for coverage so distributions compare across eras.
+    team_dollars = agg.groupby(["season", "team"])["cap_dollars"].transform("sum")
+    agg["cap_pct_norm"] = (agg["cap_dollars"] / team_dollars).where(team_dollars > 0)
     agg["era"] = agg["season"].map(config.era_for_season)
 
     cols = ["season", "team", "era", "pos_group", "cap_dollars",

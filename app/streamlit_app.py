@@ -27,6 +27,20 @@ from gridiron.modeling import (cap_efficiency, clustering, free_agents, sb_maxer
 
 st.set_page_config(page_title="GridironIQ", page_icon="🏈", layout="wide")
 
+# Bust all cached DB reads when the data snapshot changes under the app. Every
+# @st.cache_data loader below has no TTL, so after a redeploy ships a fresh
+# data/gridiron.db the old container keeps serving its cached tables until a full
+# reboot — the "No cap data" / stale-grade staleness seen in practice. The DB
+# file's mtime changes on each deploy (new checkout), so clearing the cache when
+# it moves makes new data appear without waiting on a reboot.
+try:
+    _db_version = config.DB_PATH.stat().st_mtime
+except OSError:
+    _db_version = 0.0
+if st.session_state.get("_db_version") != _db_version:
+    st.cache_data.clear()
+    st.session_state["_db_version"] = _db_version
+
 THESIS = ("In the salary cap era, which positions truly win championships — "
           "and are teams paying for it correctly?")
 
@@ -186,7 +200,11 @@ def boardroom_tab() -> None:
                 "shares reflect *committed* money, not a complete team.")
     prof = _team_season(team, season)
     if prof.empty:
-        st.info(f"No cap data for {team} in {season}.")
+        if season > config.CURRENT_SEASON:
+            st.info(f"No cap committed to {team} for {season} yet — no current "
+                    "contract on the books runs that far out.")
+        else:
+            st.info(f"No cap data for {team} in {season}.")
     else:
         left, right = st.columns([3, 2])
         left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
