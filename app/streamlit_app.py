@@ -189,7 +189,7 @@ def boardroom_tab() -> None:
         st.info(f"No cap data for {team} in {season}.")
     else:
         left, right = st.columns([3, 2])
-        left.bar_chart(prof.set_index("pos_group")["cap_pct_norm"], height=340)
+        left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
         right.dataframe(prof, hide_index=True, height=340, column_config={
             "pos_group": st.column_config.TextColumn("pos"),
             "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
@@ -323,6 +323,64 @@ def film_room_tab() -> None:
             st.json(payload)
         if st.button("Generate matchup preview", type="primary"):
             _run_report(breakdown, payload)
+
+
+#: Position groups → unit, for coloring the cap-allocation chart. Lets the O/D
+#: cap balance read at a glance on top of the per-position shares.
+_POS_UNIT = {
+    "QB": "Offense", "RB": "Offense", "WR": "Offense", "TE": "Offense", "OL": "Offense",
+    "IDL": "Defense", "EDGE": "Defense", "LB": "Defense", "CB": "Defense", "S": "Defense",
+    "SPEC": "Special teams",
+}
+#: Unit colors — validated CVD-safe on the app's light surface (dataviz validator:
+#: adjacent ΔE 20.8 deutan, all ≥ 3:1 contrast).
+_UNIT_COLOR = {"Offense": "#1a9850", "Defense": "#2b6cb0", "Special teams": "#a86a00"}
+
+
+def _spending_chart(prof: pd.DataFrame, team: str, season: int):
+    """Horizontal, sorted bar of a team's cap allocation by position group.
+
+    A sorted bar beats a pie for this: ~11 categories read as length (precise)
+    rather than angle/area (not), the ranking of spending priorities is immediate,
+    and every label stays legible. Bars are colored by unit (offense / defense /
+    special teams) so the offense-vs-defense cap balance also reads at a glance.
+    """
+    import plotly.graph_objects as go
+    d = prof.copy()
+    d["unit"] = d["pos_group"].map(_POS_UNIT).fillna("Special teams")
+    d = d.sort_values("cap_pct_norm", ascending=True)      # largest lands on top
+    order = d["pos_group"].tolist()
+
+    fig = go.Figure()
+    for unit, color in _UNIT_COLOR.items():
+        sub = d[d["unit"] == unit]
+        if sub.empty:
+            continue
+        fig.add_bar(
+            x=sub["cap_pct_norm"], y=sub["pos_group"], name=unit, orientation="h",
+            marker_color=color, cliponaxis=False,
+            text=[f"{v:.0%}" for v in sub["cap_pct_norm"]], textposition="outside",
+            textfont=dict(color="#222", size=11),
+            customdata=sub[["cap_pct", "n_players"]].to_numpy(),
+            hovertemplate=("<b>%{y}</b> · " + unit +
+                           "<br>%{x:.1%} of the team's cap"
+                           "<br>%{customdata[0]:.1%} of the league cap · "
+                           "%{customdata[1]} players<extra></extra>"),
+        )
+    xmax = float(d["cap_pct_norm"].max() or 0) * 1.18 or 1.0
+    fig.update_layout(
+        barmode="stack", height=360, bargap=0.28,
+        margin=dict(t=46, b=10, l=10, r=20),
+        title=dict(text=f"{team} {season} — cap share by position",
+                   x=0, xanchor="left", font=dict(size=14)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0,
+                    font=dict(size=11), title=None),
+        xaxis=dict(tickformat=".0%", range=[0, xmax], showgrid=True,
+                   gridcolor="rgba(0,0,0,0.06)", zeroline=False, title=None),
+        yaxis=dict(categoryorder="array", categoryarray=order, title=None),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
 
 
 def _grade(pctile: float) -> str:
