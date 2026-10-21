@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
 
@@ -66,7 +67,15 @@ def read_table(table: str) -> pd.DataFrame:
 
 
 def query(sql: str, **params) -> pd.DataFrame:
-    """Run a parameterized SELECT and return the results as a DataFrame."""
+    """Run a parameterized SELECT and return the results as a DataFrame.
+
+    Numpy scalars (e.g. an ``np.int64`` season straight off a Streamlit selectbox
+    or a pandas ``.unique()``) are coerced to native Python types first: the
+    SQLite driver won't bind a numpy scalar, so ``WHERE season = :s`` silently
+    matches no rows and the caller reads it as "no data".
+    """
+    params = {k: (v.item() if isinstance(v, np.generic) else v)
+              for k, v in params.items()}
     with get_engine().connect() as conn:
         return pd.read_sql_query(text(sql), conn, params=params or None)
 

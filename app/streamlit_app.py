@@ -106,7 +106,9 @@ def _team_season(team: str, season: int) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def _seasons_teams() -> tuple[list[int], list[str]]:
     df = db.query("SELECT DISTINCT season, team FROM positional_spending")
-    return sorted(df["season"].unique(), reverse=True), sorted(df["team"].unique())
+    # Native Python ints — not np.int64 — so season comparisons and DB binds work.
+    return (sorted((int(s) for s in df["season"].unique()), reverse=True),
+            sorted(df["team"].unique()))
 
 
 @st.cache_data(show_spinner=True)
