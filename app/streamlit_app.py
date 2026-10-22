@@ -97,7 +97,8 @@ def _premium_fig(prem: pd.DataFrame):
 @st.cache_data(show_spinner=False)
 def _team_season(team: str, season: int) -> pd.DataFrame:
     return db.query(
-        "SELECT pos_group, cap_pct, cap_pct_norm, n_players FROM positional_spending "
+        "SELECT pos_group, cap_pct, cap_pct_norm, cap_dollars, n_players "
+        "FROM positional_spending "
         "WHERE team = :t AND season = :s ORDER BY cap_pct_norm DESC",
         t=team, s=season,
     )
@@ -208,14 +209,25 @@ def boardroom_tab() -> None:
         else:
             st.info(f"No cap data for {team} in {season}.")
     else:
+        # Cap-limit gauge: how much of the league cap this team has committed.
+        league_cap = config.LEAGUE_SALARY_CAP.get(season)
+        committed_usd = float(pd.to_numeric(prof["cap_dollars"], errors="coerce").sum())
+        if league_cap:
+            st.plotly_chart(
+                _cap_gauge(100 * committed_usd / league_cap, committed_usd,
+                           float(league_cap), season),
+                use_container_width=True)
         left, right = st.columns([3, 2])
         left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
-        right.dataframe(prof, hide_index=True, height=340, column_config={
-            "pos_group": st.column_config.TextColumn("pos"),
-            "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
-            "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
-            "n_players": st.column_config.NumberColumn("players"),
-        })
+        right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
+        st.dataframe(
+            prof[["pos_group", "cap_pct", "cap_pct_norm", "n_players"]],
+            hide_index=True, use_container_width=True, column_config={
+                "pos_group": st.column_config.TextColumn("pos"),
+                "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
+                "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+                "n_players": st.column_config.NumberColumn("players"),
+            })
 
     # On-field efficiency from the PBP lakehouse (nflfastR EPA, built by the Spark
     # medallion and published to the app db). Did the cap allocation translate?
@@ -389,16 +401,72 @@ def _spending_chart(prof: pd.DataFrame, team: str, season: int):
         )
     xmax = float(d["cap_pct_norm"].max() or 0) * 1.18 or 1.0
     fig.update_layout(
-        barmode="stack", height=360, bargap=0.28,
-        margin=dict(t=46, b=10, l=10, r=20),
+        barmode="stack", height=380, bargap=0.28,
+        margin=dict(t=44, b=46, l=10, r=24),
         title=dict(text=f"{team} {season} — cap share by position",
-                   x=0, xanchor="left", font=dict(size=14)),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0,
+                   x=0, xanchor="left", y=0.97, font=dict(size=14)),
+        legend=dict(orientation="h", yanchor="top", y=-0.08, x=0,
                     font=dict(size=11), title=None),
         xaxis=dict(tickformat=".0%", range=[0, xmax], showgrid=True,
                    gridcolor="rgba(0,0,0,0.06)", zeroline=False, title=None),
         yaxis=dict(categoryorder="array", categoryarray=order, title=None),
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+
+def _cap_gauge(pct: float, usd: float, cap: float, season: int):
+    """Bullet gauge: how much of the league cap a team has committed, with the
+    cap limit (100%) marked. Green under the cap, amber as it tightens, red over."""
+    import plotly.graph_objects as go
+    axis_max = max(110.0, pct + 8)
+    bar_color = "#cf222e" if pct > 100 else "#bf8700" if pct >= 92 else "#1a7f37"
+    label = "committed" if season <= config.CURRENT_SEASON else "committed (future)"
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=pct,
+        number=dict(suffix="%", font=dict(size=22)),
+        title=dict(text=f"Cap {label} — ${usd / 1e6:,.0f}M of ${cap / 1e6:,.0f}M cap",
+                   font=dict(size=13)),
+        gauge=dict(
+            shape="bullet",
+            axis=dict(range=[0, axis_max], ticksuffix="%"),
+            bar=dict(color=bar_color, thickness=0.62), borderwidth=0,
+            steps=[dict(range=[0, 100], color="#eef1f3"),
+                   dict(range=[100, axis_max], color="#fbe9ea")],
+            threshold=dict(line=dict(color="#cf222e", width=3),
+                           thickness=0.9, value=100),
+        ),
+    ))
+    fig.update_layout(height=120, margin=dict(t=44, b=12, l=24, r=24),
+                      paper_bgcolor="rgba(0,0,0,0)")
+    return fig
+
+
+def _spending_donut(prof: pd.DataFrame, team: str):
+    """Three-slice donut of cap split across offense / defense / special teams —
+    the high-level balance the detailed bar can't show at a glance. A pie earns
+    its place here: only three parts of a whole, so the comparison stays honest."""
+    import plotly.graph_objects as go
+    d = prof.copy()
+    d["unit"] = d["pos_group"].map(_POS_UNIT).fillna("Special teams")
+    units = ["Offense", "Defense", "Special teams"]
+    share = d.groupby("unit")["cap_pct_norm"].sum().reindex(units).fillna(0.0)
+    fig = go.Figure(go.Pie(
+        labels=units, values=share.to_numpy(), hole=0.58, sort=False,
+        direction="clockwise",
+        marker=dict(colors=[_UNIT_COLOR[u] for u in units],
+                    line=dict(color="#ffffff", width=2)),
+        texttemplate="%{label}<br>%{percent}", textposition="inside",
+        insidetextorientation="horizontal", textfont=dict(color="#ffffff", size=12),
+        hovertemplate="<b>%{label}</b><br>%{percent} of the team's cap<extra></extra>",
+    ))
+    fig.update_layout(
+        height=380, margin=dict(t=44, b=10, l=10, r=10), showlegend=False,
+        title=dict(text="Offense vs defense", x=0, xanchor="left", y=0.97,
+                   font=dict(size=14)),
+        annotations=[dict(text=f"<b>{team}</b>", x=0.5, y=0.5, showarrow=False,
+                          font=dict(size=20, color="#333"))],
+        paper_bgcolor="rgba(0,0,0,0)",
     )
     return fig
 
