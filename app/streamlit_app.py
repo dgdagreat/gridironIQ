@@ -689,12 +689,13 @@ def maxer_tab() -> None:
     st.subheader("How far is each team from a champion-caliber roster?")
     st.caption(
         f"Grades blend **preseason caliber** (Madden + production, age-adjusted) with "
-        f"**live {meta.get('perf_season', meta['roster_season'])} performance** — "
+        f"**live {meta.get('perf_season', meta['roster_season'])} performance** "
+        f"and a small **MVP/award-buzz** nudge from market odds — "
         f"weighted more as games are played and projected to a full-season pace. "
         f"Players **out / on IR right now are set aside**, so each unit reflects who "
         f"actually suits up. Measured against a champion blueprint weighted by the "
         f"Boardroom's title-importance. "
-        f"Roster: {meta['roster_season']} · grades: Madden {meta['madden_season']} · "
+        f"Roster: {meta['roster_season']} · grades: Madden NFL {(meta['madden_season'] % 100) + 1} · "
         f"**data as of {meta['data_as_of']}**"
     )
 

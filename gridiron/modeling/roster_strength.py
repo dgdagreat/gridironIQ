@@ -81,6 +81,12 @@ PROJ_SHRINK_GAMES = 3.0
 #: shouldn't grade out mid just because the room behind him is thin.
 STAR_WEIGHT = 0.80
 
+#: MVP / award "buzz" nudge (see ingestion.buzz). A bounded bump on the final
+#: talent, proportional to a player's market-implied award win probability, so
+#: media/MVP narrative *informs* the ranking without overturning the data-driven
+#: grade: the DPOY/MVP favorite (~0.38 implied) gets at most +0.057.
+BUZZ_WEIGHT = 0.15
+
 
 def age_factor(pos_group: str, age: float | None) -> float:
     """Position-specific age multiplier (≤1): RBs decline fast, QBs/kickers slow."""
@@ -144,6 +150,8 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
             df[col] = pd.NA
     if "currently_out" not in df:
         df["currently_out"] = False
+    if "buzz" not in df:
+        df["buzz"] = 0.0
 
     # Injury guard: a low games total in the AV's own season means missed time.
     gp = pd.to_numeric(df["games_av0"], errors="coerce")
@@ -205,6 +213,11 @@ def player_talent_scores(players: pd.DataFrame) -> pd.DataFrame:
     target = df[["talent_base", "perf_pct"]].max(axis=1)
     blended = (1 - w_perf) * df["talent_base"] + w_perf * target
     df["talent"] = blended.where(df["perf_pct"].notna(), df["talent_base"]).clip(0, 1)
+
+    # MVP / award buzz: a small bounded bump from market-implied award odds, so
+    # media narrative nudges the ranking without overturning the earned grade.
+    buzz = pd.to_numeric(df["buzz"], errors="coerce").fillna(0.0)
+    df["talent"] = (df["talent"] + BUZZ_WEIGHT * buzz).clip(0, 1)
     return df
 
 

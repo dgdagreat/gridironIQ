@@ -469,6 +469,10 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     players = players.merge(avail, on="gsis_id", how="left")
     players["currently_out"] = players["currently_out"].fillna(False).astype(bool)
 
+    # MVP / award "buzz" — a small market-implied reputation nudge (see buzz.py).
+    from gridiron.ingestion import buzz
+    players["buzz"] = buzz.player_buzz(players["player"], players["team"])
+
     players = players[players["pos_group"].ne("UNK") & players["team"].notna()]
 
     perf_qual = (players["games_2026"] >= 2) & players["perf_raw"].notna()
@@ -486,6 +490,7 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
         "n_perf": int(perf_qual.sum()),
         "n_starters": int((players["depth_rank"] == 1).sum()),
         "n_out": int(players["currently_out"].sum()),
+        "n_buzz": int((pd.to_numeric(players["buzz"], errors="coerce") > 0).sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta
