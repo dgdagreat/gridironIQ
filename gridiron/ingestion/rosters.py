@@ -469,9 +469,10 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     players = players.merge(avail, on="gsis_id", how="left")
     players["currently_out"] = players["currently_out"].fillna(False).astype(bool)
 
-    # MVP / award "buzz" — a small market-implied reputation nudge (see buzz.py).
+    # MVP / award "buzz" — a small market-implied reputation nudge, live from
+    # Kalshi award markets (see buzz.py; falls back to a snapshot if offline).
     from gridiron.ingestion import buzz
-    players["buzz"] = buzz.player_buzz(players["player"], players["team"])
+    players["buzz"] = buzz.player_buzz(players["player"], players["pos_group"])
 
     players = players[players["pos_group"].ne("UNK") & players["team"].notna()]
 
