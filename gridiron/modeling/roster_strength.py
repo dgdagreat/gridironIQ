@@ -81,11 +81,13 @@ PROJ_SHRINK_GAMES = 3.0
 #: shouldn't grade out mid just because the room behind him is thin.
 STAR_WEIGHT = 0.80
 
-#: MVP / award "buzz" nudge (see ingestion.buzz). A bounded bump on the final
-#: talent, proportional to a player's market-implied award win probability, so
-#: media/MVP narrative *informs* the ranking without overturning the data-driven
-#: grade: the DPOY/MVP favorite (~0.38 implied) gets at most +0.057.
-BUZZ_WEIGHT = 0.15
+#: Award "buzz" / recognition nudge (see ingestion.buzz). A bounded bump on the
+#: final talent, proportional to a player's signal (0–1): his recent All-Pro
+#: recognition and/or current MVP-market implied probability. Kept small so it
+#: *informs* the ranking without overturning the data-driven grade — the most
+#: decorated (a repeat All-Pro, signal 1.0) gets at most +0.06, a single All-Pro
+#: or MVP contender ~+0.02.
+BUZZ_WEIGHT = 0.06
 
 
 def age_factor(pos_group: str, age: float | None) -> float:

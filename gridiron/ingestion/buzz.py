@@ -60,12 +60,68 @@ AWARD_BUZZ: list[tuple[str, str, str, float]] = [
     ("Aidan Hutchinson",   "DET", "DPOY", 0.063),
 ]
 
-_SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)\.?$")
+# --------------------------------------------------------------------------- #
+# Recognition: recent All-Pro selections (the "voting buzz" / Pro-Bowl-type
+# accolade signal). Scraped from Wikipedia's All-Pro Team pages, verified by
+# hand, and baked here so it's reliable (re-scrape + review once a year when the
+# teams are announced). A player recognized by the voters as elite gets a small
+# recognition boost on top of the data-driven grade — so proven stars grade out.
+# --------------------------------------------------------------------------- #
+ACCOLADES_AS_OF = "2026-10-23"  # through the 2025 All-Pro teams
+#: How much each season's selection counts (recency-decayed).
+ALL_PRO_RECENCY: dict[int, float] = {2025: 1.0, 2024: 0.6}
+#: season -> side -> [players selected All-Pro (1st or 2nd team)].
+ALL_PRO: dict[int, dict[str, list[str]]] = {
+    2025: {
+        "off": ["Matthew Stafford", "Drake Maye", "Bijan Robinson", "James Cook",
+                "Christian McCaffrey", "Jonathan Taylor", "Kyle Juszczyk",
+                "Patrick Ricard", "Puka Nacua", "Jaxon Smith-Njigba",
+                "Ja'Marr Chase", "George Pickens", "Chris Olave",
+                "Amon-Ra St. Brown", "Trey McBride", "Kyle Pitts", "Garett Bolles",
+                "Trent Williams", "Joe Thuney", "Quenton Nelson", "Creed Humphrey",
+                "Aaron Brewer", "Quinn Meinerz", "Chris Lindstrom", "Penei Sewell",
+                "Darnell Wright"],
+        "def": ["Myles Garrett", "Micah Parsons", "Will Anderson Jr.",
+                "Aidan Hutchinson", "Danielle Hunter", "Brian Burns",
+                "Jeffery Simmons", "Zach Allen", "Leonard Williams",
+                "Quinnen Williams", "Cameron Heyward", "Jordyn Brooks",
+                "Jack Campbell", "Ernest Jones", "Devin Lloyd", "Nik Bonitto",
+                "Derek Stingley Jr.", "Quinyon Mitchell", "Patrick Surtain II",
+                "Jaycee Horn", "Devon Witherspoon", "Cooper DeJean",
+                "Derwin James", "Kyle Hamilton", "Kevin Byard", "Jessie Bates",
+                "Talanoa Hufanga", "Xavier McKinney"],
+    },
+    2024: {
+        "off": ["Lamar Jackson", "Josh Allen", "Saquon Barkley", "Derrick Henry",
+                "Patrick Ricard", "Kyle Juszczyk", "Ja'Marr Chase",
+                "Justin Jefferson", "Amon-Ra St. Brown", "Terry McLaurin",
+                "CeeDee Lamb", "A.J. Brown", "Brock Bowers", "George Kittle",
+                "Tristan Wirfs", "Jordan Mailata", "Joe Thuney", "Quenton Nelson",
+                "Creed Humphrey", "Frank Ragnow", "Quinn Meinerz",
+                "Chris Lindstrom", "Penei Sewell", "Lane Johnson",
+                "Landon Dickerson"],
+        "def": ["Myles Garrett", "Trey Hendrickson", "T.J. Watt", "Nik Bonitto",
+                "Andrew Van Ginkel", "Cameron Heyward", "Chris Jones",
+                "Dexter Lawrence", "Zach Allen", "Jalen Carter", "Zack Baun",
+                "Fred Warner", "Roquan Smith", "Frankie Luvu", "Bobby Wagner",
+                "Zaire Franklin", "Patrick Surtain II", "Derek Stingley Jr.",
+                "Trent McDuffie", "Christian Gonzalez", "Marlon Humphrey",
+                "Derwin James", "Kerby Joseph", "Xavier McKinney", "Brian Branch",
+                "Kyle Hamilton", "Budda Baker"],
+    },
+}
+
+_SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)$")
+_INITIALS = re.compile(r"\b([a-z]) (?=[a-z]\b)")
 
 
 def _norm(name: object) -> str:
-    """Lowercase, drop periods and a trailing Jr./III/etc. so names match cleanly."""
-    s = str(name).lower().replace(".", "").strip()
+    """Normalize a player name for matching across sources: lowercase, straighten
+    the apostrophe, drop periods, collapse spaced initials ("a. j." / "t. j." →
+    "aj"/"tj") and strip a trailing Jr./III/etc."""
+    s = str(name).lower().replace("’", "'").replace(".", "").strip()
+    s = re.sub(r"\s+", " ", s)
+    s = _INITIALS.sub(r"\1", s)
     return _SUFFIX.sub("", s).strip()
 
 
@@ -138,9 +194,24 @@ def _manual_by_award() -> dict[str, list[tuple[str, str, float]]]:
     return out
 
 
+def recognition_scores() -> dict[tuple[str, str], float]:
+    """{(normalized_name, side) -> recognition 0..1} from recent All-Pro teams,
+    recency-weighted and normalized so a repeat (every-season) selection ≈ 1.0."""
+    raw: dict[tuple[str, str], float] = {}
+    for year, sides in ALL_PRO.items():
+        w = ALL_PRO_RECENCY.get(year, 0.0)
+        for side, players in sides.items():
+            for player in players:
+                key = (_norm(player), side)
+                raw[key] = raw.get(key, 0.0) + w
+    norm = sum(ALL_PRO_RECENCY.values()) or 1.0
+    return {k: min(v / norm, 1.0) for k, v in raw.items()}
+
+
 def _buzz_index() -> dict[tuple[str, str], float]:
-    """{(normalized_name, side) -> buzz 0..1}. Per award: live Kalshi if it's
-    trading, else the manual snapshot; a player keeps his best award buzz."""
+    """{(normalized_name, side) -> buzz 0..1}. A player's buzz is the strongest of
+    his current award-market odds (live Kalshi, else snapshot) and his recent
+    All-Pro recognition — forward hype *or* proven accolades, whichever is higher."""
     live = dict(fetch_live_buzz())
     manual = _manual_by_award()
     idx: dict[tuple[str, str], float] = {}
@@ -148,6 +219,8 @@ def _buzz_index() -> dict[tuple[str, str], float]:
         for nm, side, p in live.get(award) or manual.get(award, []):
             key = (nm, side)
             idx[key] = max(idx.get(key, 0.0), float(p))
+    for key, r in recognition_scores().items():
+        idx[key] = max(idx.get(key, 0.0), r)
     return idx
 
 

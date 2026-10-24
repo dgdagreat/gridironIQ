@@ -724,7 +724,8 @@ def maxer_tab() -> None:
     st.caption(
         f"Grades blend **preseason caliber** (Madden + production, age-adjusted) with "
         f"**live {meta.get('perf_season', meta['roster_season'])} performance** "
-        f"and a small **MVP/award-buzz** nudge from market odds — "
+        f"and a small **recognition** nudge (recent All-Pro voting + the live MVP "
+        f"betting market) — "
         f"weighted more as games are played and projected to a full-season pace. "
         f"Players **out / on IR right now are set aside**, so each unit reflects who "
         f"actually suits up. Measured against a champion blueprint weighted by the "
