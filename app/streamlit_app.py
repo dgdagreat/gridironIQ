@@ -135,7 +135,32 @@ def _free_agents() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def _player_talent() -> pd.DataFrame:
-    return db.read_table("player_talent")
+    df = db.read_table("player_talent")
+    df["talent_pct"] = _individual_pct(df)
+    return df
+
+
+def _individual_pct(df: pd.DataFrame) -> pd.Series:
+    """Each player's talent as a 0–100 percentile **among NFL starters** at his
+    position — so a standout grades out on his own merit even if the unit around
+    him is weak. Reference pool = depth-chart starters (falls back to everyone at
+    the position if no starter is flagged)."""
+    import numpy as np
+    out = pd.Series(np.nan, index=df.index)
+    if "talent" not in df.columns:
+        return out
+    is_starter = (df["depth_rank"].eq(1) if "depth_rank" in df.columns
+                  else pd.Series(True, index=df.index))
+    for _pg, grp in df.groupby("pos_group"):
+        ref = grp.loc[is_starter.loc[grp.index], "talent"].dropna()
+        if ref.empty:
+            ref = grp["talent"].dropna()
+        if ref.empty:
+            continue
+        ref = ref.sort_values().to_numpy()
+        t = pd.to_numeric(grp["talent"], errors="coerce").to_numpy()
+        out.loc[grp.index] = np.searchsorted(ref, t, side="right") / len(ref) * 100
+    return out.round(1)
 
 
 @st.cache_data(show_spinner=False)
@@ -560,18 +585,21 @@ def _assign_starters(team: str, players: pd.DataFrame | None) -> list[dict | Non
                     "age": pick.get("age"), "dcp": pick.get("depth_chart_position"),
                     "injured": bool(pick.get("injured_last")),
                     "out_now": bool(pick.get("_out")),
-                    "status": pick.get("injury_status")})
+                    "status": pick.get("injury_status"),
+                    "grade_pct": pick.get("talent_pct")})
     return out
 
 
 def _field_figure(team: str, strength: pd.DataFrame,
-                  players: pd.DataFrame | None = None, highlight: str | None = None):
+                  players: pd.DataFrame | None = None, highlight: str | None = None,
+                  mode: str = "individual"):
     """Plotly formation view (vertical): the team's likely **starters** on the
     base most teams run — 11-personnel offense (bottom) vs. a nickel defense
     (top). Each box is the real player at that slot (from ``players`` via
-    :func:`_assign_starters`), shaded by its position **group** grade (green
-    strong → red weak); hover shows the player. Boxes in the ``highlight`` group
-    get a bright gold ring.
+    :func:`_assign_starters`). ``mode="individual"`` shades each box by **that
+    player's own grade** (so a standout isn't dragged down by a weak unit around
+    him); ``mode="unit"`` shades by the position-group grade. Hover always shows
+    both. Boxes in the ``highlight`` group get a bright gold ring.
     """
     import plotly.graph_objects as go
     rs = strength[strength["team"] == team].set_index("pos_group")
@@ -599,8 +627,7 @@ def _field_figure(team: str, strength: pd.DataFrame,
     for i, (label, grp, x, y, _bucket) in enumerate(_FORMATION):
         who = starters[i]
         if grp in rs.index:
-            s = float(rs.at[grp, "strength"]); g = _grade(s); rk = int(tr.get(grp, n))
-            colors.append(_GRADE_BG[g])
+            s = float(rs.at[grp, "strength"]); ug = _grade(s); rk = int(tr.get(grp, n))
             if who:
                 ovr = f"Madden {who['ovr']:.0f}" if pd.notna(who["ovr"]) else "unrated"
                 age = f"{who['age']:.0f}" if pd.notna(who["age"]) else "—"
@@ -612,11 +639,18 @@ def _field_figure(team: str, strength: pd.DataFrame,
                     inj = " · 🩹 credited back from injury"
                 else:
                     inj = ""
+                ipct = who.get("grade_pct")
+                ig = _grade(ipct) if pd.notna(ipct) else ug
+                colors.append(_GRADE_BG[ig if mode == "individual" else ug])
+                top = (f" · top {max(1, round(100 - ipct))}% of {grp}s"
+                       if pd.notna(ipct) else "")
                 hovers.append(f"<b>{who['player']}</b> · {label} ({dcp}){inj}<br>"
                               f"{ovr} · age {age}<br>"
-                              f"{grp} unit: grade {g} · #{rk} of {n} in the NFL")
+                              f"player grade <b>{ig}</b>{top}<br>"
+                              f"{grp} unit: grade {ug} · #{rk} of {n} in the NFL")
             else:
-                hovers.append(f"<b>{label}</b> · {grp} unit · grade {g}<br>"
+                colors.append(_GRADE_BG[ug])
+                hovers.append(f"<b>{label}</b> · {grp} unit · grade {ug}<br>"
                               f"#{rk} of {n} · no starter listed")
         else:
             colors.append("#8a8a8a")
@@ -755,17 +789,24 @@ def maxer_tab() -> None:
     st.markdown("##### 🏟️ Your roster, on the field")
     st.caption("Your projected **starters** on the base most teams run — "
                "**11-personnel** offense (bottom) vs. a **nickel** defense (top). "
-               "Boxes shade by unit grade (green strong → red weak); the **nickel "
-               "back** is your 3rd corner and the **slot** your 3rd receiver. "
-               "**Hover any box for the player.**")
+               "Boxes shade green (strong) → red (weak); the **nickel back** is your "
+               "3rd corner and the **slot** your 3rd receiver. "
+               "**Hover any box** for the player's own grade *and* his unit's.")
     units = list(needs["pos_group"])            # weakest first
-    picked = st.selectbox("🔍 Break down a unit (weakest first)", units,
-                          key=f"mx_pick_{team}")
+    tc1, tc2 = st.columns([2, 1])
+    picked = tc1.selectbox("🔍 Break down a unit (weakest first)", units,
+                           key=f"mx_pick_{team}")
+    shade = tc2.radio("Shade boxes by", ["Individual player", "Unit grade"],
+                      horizontal=True, key=f"mx_shade_{team}",
+                      help="Individual = each player's own grade vs. NFL starters "
+                           "at his spot, so a star isn't dragged down by a weak unit.")
     roster = _player_talent() if db.table_exists("player_talent") else None
     fc = st.columns([1, 2, 1])
     with fc[1]:
-        st.plotly_chart(_field_figure(team, strength, players=roster, highlight=picked),
-                        use_container_width=True, key=f"field_{team}")
+        st.plotly_chart(
+            _field_figure(team, strength, players=roster, highlight=picked,
+                          mode="unit" if shade == "Unit grade" else "individual"),
+            use_container_width=True, key=f"field_{team}")
 
     left, right = st.columns([3, 2])
     with left:
