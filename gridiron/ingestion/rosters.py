@@ -463,6 +463,15 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
     players["depth_rank"] = players["gsis_id"].map(
         load_depth_charts(roster_season, force=force))
 
+    # Learned player value: a gradient-boosted rest-of-season forecast replaces the
+    # hand-tuned composite as the in-season production signal for skill players
+    # (QB/RB/WR/TE), so their grades track a model trained on real production —
+    # highlight plays included. Degrades to the composite if the model can't run.
+    from gridiron.modeling import player_value
+    players["ml_value"] = players["gsis_id"].map(player_value.season_values(roster_season))
+    skill = players["pos_group"].isin(player_value.SKILL_POS) & players["ml_value"].notna()
+    players.loc[skill, "perf_raw"] = players.loc[skill, "ml_value"]
+
     # Current injury / inactive status — so a player who's Out or on IR isn't
     # graded as a starter, and the unit reflects whoever actually suits up.
     avail = player_availability(roster_season, force=force)
@@ -492,6 +501,7 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
         "n_starters": int((players["depth_rank"] == 1).sum()),
         "n_out": int(players["currently_out"].sum()),
         "n_buzz": int((pd.to_numeric(players["buzz"], errors="coerce") > 0).sum()),
+        "n_ml_value": int(players["ml_value"].notna().sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta

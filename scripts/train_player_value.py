@@ -51,7 +51,7 @@ def main() -> int:
             week = int(w[w.get("season_type", "REG").eq("REG")]["week"].max())
         except Exception:  # noqa: BLE001
             week = 6
-    vals = pv.predict_values(rep, args.season, as_of_week=week)
+    vals = pv.predict_values(rep.model, rep.feature_cols, args.season, week)
     print("-" * 60)
     print(f"  Top {args.top} projected values — {args.season} through week {week} "
           f"(rest-of-season fantasy pts/game):")

@@ -110,22 +110,35 @@ def _design_matrix(tr: pd.DataFrame) -> pd.DataFrame:
     return pd.get_dummies(tr[NUMERIC_FEATURES + ["pos"]], columns=["pos"])
 
 
+def _new_model(random_state: int) -> HistGradientBoostingRegressor:
+    return HistGradientBoostingRegressor(max_depth=4, learning_rate=0.08,
+                                         max_iter=300, min_samples_leaf=25,
+                                         random_state=random_state)
+
+
+def fit_model(seasons=TRAIN_SEASONS, cutoffs=CUTOFFS, random_state: int = 42):
+    """Fit the value model (no CV) and return ``(model, feature_cols)`` — the
+    cheap path the refresh pipeline uses."""
+    tr = build_training_frame(seasons, cutoffs)
+    X, y = _design_matrix(tr), tr["y"]
+    model = _new_model(random_state).fit(X, y)
+    return model, list(X.columns)
+
+
 def train_value_model(seasons=TRAIN_SEASONS, cutoffs=CUTOFFS,
                       random_state: int = 42) -> ValueReport:
     """Train + cross-validate the value model and rank feature importance."""
+    from sklearn.metrics import r2_score
     tr = build_training_frame(seasons, cutoffs)
     X, y = _design_matrix(tr), tr["y"]
     cv = KFold(5, shuffle=True, random_state=random_state)
-    model = HistGradientBoostingRegressor(max_depth=4, learning_rate=0.08,
-                                          max_iter=300, min_samples_leaf=25,
-                                          random_state=random_state)
+    model = _new_model(random_state)
     r2 = cross_val_score(model, X, y, cv=cv, scoring="r2")
     mae = -cross_val_score(model, X, y, cv=cv, scoring="neg_mean_absolute_error")
     model.fit(X, y)
     perm = permutation_importance(model, X, y, n_repeats=5,
                                   random_state=random_state, scoring="r2")
     imp = sorted(zip(X.columns, perm.importances_mean), key=lambda t: -t[1])
-    from sklearn.metrics import r2_score
     return ValueReport(
         n_samples=len(tr), cv_r2_mean=float(r2.mean()), cv_r2_std=float(r2.std()),
         cv_mae=float(mae.mean()), baseline_r2=float(r2_score(y, tr["fppr_g"])),
@@ -133,7 +146,25 @@ def train_value_model(seasons=TRAIN_SEASONS, cutoffs=CUTOFFS,
         feature_cols=list(X.columns))
 
 
-def predict_values(report: ValueReport, season: int, as_of_week: int) -> pd.DataFrame:
+def season_values(season: int, as_of_week: int | None = None,
+                  train_seasons=TRAIN_SEASONS) -> pd.Series:
+    """``gsis_id -> projected value`` for a season's skill players. Trains on
+    seasons strictly before ``season`` (no leakage) and predicts through the
+    latest played week unless ``as_of_week`` is given. Empty if data is missing."""
+    try:
+        seasons = tuple(s for s in train_seasons if s < season) or train_seasons
+        model, cols = fit_model(seasons)
+        if as_of_week is None:
+            w = load_weekly_stats(season)
+            reg = w[w.get("season_type", pd.Series("REG", index=w.index)).eq("REG")]
+            as_of_week = int(reg["week"].max())
+        vals = predict_values(model, cols, season, as_of_week)
+    except Exception:  # noqa: BLE001 - value is an enhancement; never break the refresh
+        return pd.Series(dtype="float64", name="ml_value")
+    return vals.set_index("player_id")["value"].rename("ml_value")
+
+
+def predict_values(model, feature_cols, season: int, as_of_week: int) -> pd.DataFrame:
     """Predicted rest-of-season value (fantasy pts/game) for a season's skill
     players, from their form through ``as_of_week``. Columns: player_id, player,
     position, team, games, value."""
@@ -155,7 +186,7 @@ def predict_values(report: ValueReport, season: int, as_of_week: int) -> pd.Data
                                      "games", "value"])
     pv = pd.DataFrame(rows)
     X = pd.get_dummies(pv[NUMERIC_FEATURES + ["pos"]], columns=["pos"])
-    X = X.reindex(columns=report.feature_cols, fill_value=0)
-    pv["value"] = report.model.predict(X).round(2)
+    X = X.reindex(columns=feature_cols, fill_value=0)
+    pv["value"] = model.predict(X).round(2)
     return (pv[["player_id", "player", "position", "team", "games", "value"]]
             .sort_values("value", ascending=False, ignore_index=True))
