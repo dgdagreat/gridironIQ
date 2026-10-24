@@ -464,13 +464,19 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
         load_depth_charts(roster_season, force=force))
 
     # Learned player value: a gradient-boosted rest-of-season forecast replaces the
-    # hand-tuned composite as the in-season production signal for skill players
-    # (QB/RB/WR/TE), so their grades track a model trained on real production —
-    # highlight plays included. Degrades to the composite if the model can't run.
-    from gridiron.modeling import player_value
-    players["ml_value"] = players["gsis_id"].map(player_value.season_values(roster_season))
-    skill = players["pos_group"].isin(player_value.SKILL_POS) & players["ml_value"].notna()
-    players.loc[skill, "perf_raw"] = players.loc[skill, "ml_value"]
+    # hand-tuned composite as the in-season production signal. Skill players
+    # (QB/RB/WR/TE) are graded on a fantasy-points model (highlight plays included);
+    # box-score defenders (IDL/EDGE/LB/CB/S) on an IDP model (disruption plays
+    # included). The two share the ml_value column but never cross the position
+    # groups they're percentile-ranked within. Degrades to the composite per group
+    # if a model can't run (OL / specialists always keep the composite).
+    from gridiron.modeling import defense_value, player_value
+    ml = (player_value.season_values(roster_season)
+          .combine_first(defense_value.season_values(roster_season)))
+    ml_groups = player_value.SKILL_POS + defense_value.DEF_GROUPS
+    players["ml_value"] = players["gsis_id"].map(ml)
+    learned = players["pos_group"].isin(ml_groups) & players["ml_value"].notna()
+    players.loc[learned, "perf_raw"] = players.loc[learned, "ml_value"]
 
     # Current injury / inactive status — so a player who's Out or on IR isn't
     # graded as a starter, and the unit reflects whoever actually suits up.
@@ -502,6 +508,10 @@ def build_player_talent(season: int | None = None, *, force: bool = False,
         "n_out": int(players["currently_out"].sum()),
         "n_buzz": int((pd.to_numeric(players["buzz"], errors="coerce") > 0).sum()),
         "n_ml_value": int(players["ml_value"].notna().sum()),
+        "n_ml_skill": int((players["ml_value"].notna()
+                           & players["pos_group"].isin(player_value.SKILL_POS)).sum()),
+        "n_ml_def": int((players["ml_value"].notna()
+                         & players["pos_group"].isin(defense_value.DEF_GROUPS)).sum()),
     }
     log.info("Player talent: %s", meta)
     return players.reset_index(drop=True), meta
