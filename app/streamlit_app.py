@@ -586,7 +586,8 @@ def _assign_starters(team: str, players: pd.DataFrame | None) -> list[dict | Non
                     "injured": bool(pick.get("injured_last")),
                     "out_now": bool(pick.get("_out")),
                     "status": pick.get("injury_status"),
-                    "grade_pct": pick.get("talent_pct")})
+                    "grade_pct": pick.get("talent_pct"),
+                    "ml_value": pick.get("ml_value")})
     return out
 
 
@@ -644,9 +645,19 @@ def _field_figure(team: str, strength: pd.DataFrame,
                 colors.append(_GRADE_BG[ig if mode == "individual" else ug])
                 top = (f" · top {max(1, round(100 - ipct))}% of {grp}s"
                        if pd.notna(ipct) else "")
+                # Learned model value — the number driving the grade: a
+                # rest-of-season forecast in fantasy pts/g (skill) or IDP pts/g
+                # (defense). Absent for OL/specialists and players with no
+                # in-season sample (then the grade falls back to track record).
+                mlv = who.get("ml_value")
+                if pd.notna(mlv):
+                    scale = "fantasy pts/g" if grp in ("QB", "RB", "WR", "TE") else "IDP pts/g"
+                    model_line = f"<br>🤖 model value <b>{mlv:.1f}</b> proj. {scale}"
+                else:
+                    model_line = ""
                 hovers.append(f"<b>{who['player']}</b> · {label} ({dcp}){inj}<br>"
                               f"{ovr} · age {age}<br>"
-                              f"player grade <b>{ig}</b>{top}<br>"
+                              f"player grade <b>{ig}</b>{top}{model_line}<br>"
                               f"{grp} unit: grade {ug} · #{rk} of {n} in the NFL")
             else:
                 colors.append(_GRADE_BG[ug])
@@ -792,7 +803,9 @@ def maxer_tab() -> None:
                "**11-personnel** offense (bottom) vs. a **nickel** defense (top). "
                "Boxes shade green (strong) → red (weak); the **nickel back** is your "
                "3rd corner and the **slot** your 3rd receiver. "
-               "**Hover any box** for the player's own grade *and* his unit's.")
+               "**Hover any box** for the player's own grade, his unit's, and the "
+               "🤖 **learned model value** that drives it (rest-of-season "
+               "fantasy pts/g for skill players, IDP pts/g for the defense).")
     units = list(needs["pos_group"])            # weakest first
     tc1, tc2 = st.columns([2, 1])
     picked = tc1.selectbox("🔍 Break down a unit (weakest first)", units,
