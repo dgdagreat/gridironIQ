@@ -3,8 +3,10 @@
   "configurations": [
     {
       "name": "gridironiq",
-      "runtimeExecutable": ".venv/bin/streamlit",
+      "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": [
+        "-m",
+        "streamlit",
         "run",
         "app/streamlit_app.py",
         "--server.headless",
