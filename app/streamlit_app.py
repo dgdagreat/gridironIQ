@@ -312,15 +312,19 @@ def boardroom_tab() -> None:
                         "cap_percent": st.column_config.NumberColumn("of league cap", format="percent"),
                     })
 
-        # Comparison: how far above/below the Super Bowl champion blueprint this
-        # team sits at each position — the thesis applied to *this* roster.
+        # Comparison: the team's cap "shape" laid over the Super Bowl champion
+        # blueprint (radar overlay), plus the position-by-position gap (bar).
         st.markdown(f"**{team} {season} vs. the Super Bowl champion blueprint**")
-        st.caption("Your normalized cap share at each position minus what Super Bowl "
-                   "winners have averaged there (2011–2024). Blue = you invest "
-                   "*more* than champions do; orange = *less*; zero = right on the "
-                   "blueprint.")
-        st.plotly_chart(_blueprint_fig(prof, _champion_premium(), team, season),
-                        use_container_width=True)
+        st.caption("Your normalized cap share at each position vs. what Super Bowl "
+                   "winners have averaged there (2011–2024). The radar overlays the "
+                   "two spending shapes; the bar breaks out the gap — blue = you "
+                   "invest *more* than champions, orange = *less*, zero = on the blueprint.")
+        prem = _champion_premium()
+        bp_left, bp_right = st.columns([1, 1])
+        bp_left.plotly_chart(_blueprint_radar(prof, prem, team, season),
+                             use_container_width=True)
+        bp_right.plotly_chart(_blueprint_fig(prof, prem, team, season),
+                              use_container_width=True)
 
     # On-field efficiency from the PBP lakehouse (nflfastR EPA, built by the Spark
     # medallion and published to the app db). Did the cap allocation translate?
@@ -585,6 +589,52 @@ def _blueprint_fig(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: in
     fig.update_xaxes(ticksuffix=" pts", gridcolor="#eef1f3", zeroline=True,
                      zerolinecolor="#c9ced4", zerolinewidth=1)
     fig.update_yaxes(ticksuffix="  ")
+    return fig
+
+
+def _blueprint_radar(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: int):
+    """Radar overlay: the team's normalized cap share at each position laid over
+    the Super Bowl champion average, so the roster's spending *shape* reads against
+    the title blueprint at a glance. The team polygon (green) bulging past the
+    champion outline (grey, dotted) = over-invested there; caving inside it =
+    under-invested. The diverging bar beside it carries the exact gaps."""
+    import plotly.graph_objects as go
+    from gridiron.ingestion.reference import POSITION_GROUP_ORDER
+    champ = prem.set_index("pos_group")["champion_avg"]
+    team_share = prof.set_index("pos_group")["cap_pct_norm"]
+    # Fixed spoke order (offense arc, then defense, then specialists) so the
+    # shape is comparable across teams and seasons; close the loop for the fill.
+    order = [p for p in POSITION_GROUP_ORDER if p in champ.index or p in team_share.index]
+    cats = [_POS_FULL.get(p, p) for p in order]
+    champ_v = [float(champ.get(p, 0.0)) * 100 for p in order]
+    team_v = [float(team_share.get(p, 0.0)) * 100 for p in order]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=champ_v + champ_v[:1], theta=cats + cats[:1], name="SB champion avg",
+        mode="lines", line=dict(color="#6b7280", width=2, dash="dot"),
+        fill="toself", fillcolor="rgba(107,114,128,0.10)",
+        hovertemplate="%{theta}<br>Champions %{r:.1f}% of cap<extra></extra>"))
+    fig.add_trace(go.Scatterpolar(
+        r=team_v + team_v[:1], theta=cats + cats[:1], name=f"{team} {season}",
+        mode="lines", line=dict(color="#1a9850", width=2.5),
+        fill="toself", fillcolor="rgba(26,152,80,0.22)",
+        hovertemplate=team + " %{theta}<br>%{r:.1f}% of cap<extra></extra>"))
+    rmax = (max(champ_v + team_v) or 1.0) * 1.12
+    fig.update_layout(
+        height=440, margin=dict(t=56, b=58, l=58, r=58),
+        title=dict(text=f"{team} {season} cap shape vs. the blueprint",
+                   x=0, xanchor="left", font=dict(size=14)),
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(range=[0, rmax], ticksuffix="%", angle=90,
+                            tickangle=90, tickfont=dict(size=9),
+                            gridcolor="#e5e7eb", linecolor="#e5e7eb"),
+            angularaxis=dict(rotation=90, direction="clockwise",
+                             tickfont=dict(size=11), gridcolor="#e5e7eb")),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.10, x=0.5,
+                    xanchor="center", font=dict(size=11)),
+        paper_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
