@@ -105,6 +105,32 @@ def _team_season(team: str, season: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _team_season_players(team: str, season: int) -> pd.DataFrame:
+    """Per-player cap for a team-season — the atoms the position roll-up sums.
+
+    ``positional_spending`` is literally these rows grouped by position, so the
+    individual-player view and the position view always reconcile. Adds the
+    position *group* + unit and each player's share of the team's committed cap
+    (``cap_pct_norm``, matching the position chart's metric); ``cap_percent`` is
+    already the player's share of the league cap.
+    """
+    from gridiron.ingestion.reference import classify_position
+    df = db.query(
+        "SELECT player, position, cap_number, cap_percent "
+        "FROM player_year_caps WHERE team = :t AND season = :s "
+        "AND cap_number IS NOT NULL ORDER BY cap_number DESC",
+        t=team, s=season,
+    )
+    if df.empty:
+        return df
+    df["pos_group"] = df["position"].map(classify_position)
+    df["unit"] = df["pos_group"].map(_POS_UNIT).fillna("Special teams")
+    total = float(df["cap_number"].sum()) or 1.0
+    df["cap_pct_norm"] = df["cap_number"] / total
+    return df
+
+
+@st.cache_data(show_spinner=False)
 def _seasons_teams() -> tuple[list[int], list[str]]:
     df = db.query("SELECT DISTINCT season, team FROM positional_spending")
     # Native Python ints — not np.int64 — so season comparisons and DB binds work.
@@ -242,17 +268,59 @@ def boardroom_tab() -> None:
                 _cap_gauge(100 * committed_usd / league_cap, committed_usd,
                            float(league_cap), season),
                 use_container_width=True)
-        left, right = st.columns([3, 2])
-        left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
-        right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
-        st.dataframe(
-            prof[["pos_group", "cap_pct", "cap_pct_norm", "n_players"]],
-            hide_index=True, use_container_width=True, column_config={
-                "pos_group": st.column_config.TextColumn("pos"),
-                "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
-                "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
-                "n_players": st.column_config.NumberColumn("players"),
-            })
+        # Switch the breakdown between the position-group roll-up and the
+        # individual players underneath it — the position bars are just these
+        # players summed, so the two views always reconcile.
+        view = st.radio("Break the cap down by",
+                        ["Position group", "Individual player"],
+                        horizontal=True, key="br_view")
+        if view == "Position group":
+            left, right = st.columns([3, 2])
+            left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
+            right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
+            st.dataframe(
+                prof[["pos_group", "cap_pct", "cap_pct_norm", "n_players"]],
+                hide_index=True, use_container_width=True, column_config={
+                    "pos_group": st.column_config.TextColumn("pos"),
+                    "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
+                    "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+                    "n_players": st.column_config.NumberColumn("players"),
+                })
+        else:
+            players = _team_season_players(team, season)
+            if players.empty:
+                st.info("No per-player cap rows for this team-season.")
+            else:
+                if len(players) <= 12:
+                    n = len(players)
+                    st.caption(f"All {n} players carrying committed cap.")
+                else:
+                    n = st.slider("How many players", 10, min(40, len(players)),
+                                  min(20, len(players)), key="br_player_n")
+                left, right = st.columns([3, 2])
+                left.plotly_chart(_player_spending_chart(players, team, season, n),
+                                  use_container_width=True)
+                right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
+                st.dataframe(
+                    players.head(n)[["player", "position", "cap_number",
+                                     "cap_pct_norm", "cap_percent"]],
+                    hide_index=True, use_container_width=True, column_config={
+                        "player": st.column_config.TextColumn("player"),
+                        "position": st.column_config.TextColumn("pos"),
+                        "cap_number": st.column_config.NumberColumn("cap hit", format="dollar"),
+                        "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+                        "cap_percent": st.column_config.NumberColumn("of league cap", format="percent"),
+                    })
+
+        # Comparison: how far above/below the Super Bowl champion blueprint this
+        # team sits at each position — the thesis applied to *this* roster.
+        st.markdown(f"**{team} {season} vs. the Super Bowl champion blueprint**")
+        st.caption("Your normalized cap share at each position minus what Super Bowl "
+                   "winners have averaged there (2011–2024). Blue = you invest "
+                   "*more* than champions do; orange = *less*; zero = right on the "
+                   "blueprint.")
+        st.plotly_chart(_blueprint_fig(prof, _champion_premium(), team, season),
+                        use_container_width=True)
 
     # On-field efficiency from the PBP lakehouse (nflfastR EPA, built by the Spark
     # medallion and published to the app db). Did the cap allocation translate?
@@ -437,6 +505,86 @@ def _spending_chart(prof: pd.DataFrame, team: str, season: int):
         yaxis=dict(categoryorder="array", categoryarray=order, title=None),
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
     )
+    return fig
+
+
+def _player_spending_chart(players: pd.DataFrame, team: str, season: int, n: int):
+    """Horizontal, sorted bar of a team's top ``n`` individual cap hits.
+
+    The by-position bar's atoms: each player's slice of the team's committed
+    cap, colored by his unit so the same offense/defense read carries over. Hover
+    carries the dollar hit and the share of the league cap alongside it.
+    """
+    import plotly.graph_objects as go
+    d = players.nlargest(n, "cap_number").sort_values("cap_number")  # top lands up
+    order = d["player"].tolist()
+
+    fig = go.Figure()
+    for unit, color in _UNIT_COLOR.items():
+        sub = d[d["unit"] == unit]
+        if sub.empty:
+            continue
+        fig.add_bar(
+            x=sub["cap_pct_norm"], y=sub["player"], name=unit, orientation="h",
+            marker_color=color, cliponaxis=False,
+            text=[f"{v:.0%}" for v in sub["cap_pct_norm"]], textposition="outside",
+            textfont=dict(color="#222", size=10),
+            customdata=sub[["position", "cap_number", "cap_percent"]].to_numpy(),
+            hovertemplate=("<b>%{y}</b> · %{customdata[0]}"
+                           "<br>%{x:.1%} of the team's cap"
+                           "<br>$%{customdata[1]:,.0f} · %{customdata[2]:.1%} of the league cap"
+                           "<extra></extra>"),
+        )
+    xmax = float(d["cap_pct_norm"].max() or 0) * 1.2 or 1.0
+    fig.update_layout(
+        barmode="stack", height=max(360, 24 * len(d)), bargap=0.3,
+        margin=dict(t=44, b=46, l=10, r=28),
+        title=dict(text=f"{team} {season} — cap share by player (top {len(d)})",
+                   x=0, xanchor="left", y=0.99, font=dict(size=14)),
+        legend=dict(orientation="h", yanchor="top", y=-0.06, x=0,
+                    font=dict(size=11), title=None),
+        xaxis=dict(tickformat=".0%", range=[0, xmax], showgrid=True,
+                   gridcolor="rgba(0,0,0,0.06)", zeroline=False, title=None),
+        yaxis=dict(categoryorder="array", categoryarray=order, title=None),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+
+def _blueprint_fig(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: int):
+    """Diverging bar: the team's normalized cap share at each position minus the
+    Super Bowl champion average there — how far above/below the title blueprint
+    this roster sits, position by position. Blue = over-invested vs champions,
+    orange = under-invested; the zero line is the blueprint."""
+    import plotly.graph_objects as go
+    champ = prem.set_index("pos_group")["champion_avg"]
+    d = prof.copy()
+    d["champ"] = d["pos_group"].map(champ)
+    d = d.dropna(subset=["champ"])
+    d["delta_pts"] = (d["cap_pct_norm"] - d["champ"]) * 100   # percentage points
+    d["position"] = d["pos_group"].map(_POS_FULL).fillna(d["pos_group"])
+    d = d.sort_values("delta_pts")
+    over = d["delta_pts"] >= 0
+    fig = go.Figure(go.Bar(
+        x=d["delta_pts"], y=d["position"], orientation="h",
+        marker_color=["#2b6cb0" if o else "#d4691e" for o in over],
+        text=[f"{v:+.1f}" for v in d["delta_pts"]], textposition="outside",
+        cliponaxis=False,
+        customdata=d[["cap_pct_norm", "champ"]].to_numpy(),
+        hovertemplate=("<b>%{y}</b><br>You %{customdata[0]:.1%} · "
+                       "champions %{customdata[1]:.1%}"
+                       "<br>%{x:+.1f} pts vs blueprint<extra></extra>"),
+    ))
+    fig.update_layout(
+        title=dict(text=f"{team} {season} cap share − champion average",
+                   font=dict(size=14), x=0, xanchor="left"),
+        xaxis_title="Percentage points above / below the champion blueprint",
+        yaxis_title=None, height=420, showlegend=False,
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(size=13), margin=dict(l=10, r=48, t=52, b=42))
+    fig.update_xaxes(ticksuffix=" pts", gridcolor="#eef1f3", zeroline=True,
+                     zerolinecolor="#c9ced4", zerolinewidth=1)
+    fig.update_yaxes(ticksuffix="  ")
     return fig
 
 
