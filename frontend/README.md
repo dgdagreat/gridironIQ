@@ -1,47 +1,73 @@
-# GridironIQ — React frontend (planned)
+# GridironIQ — React frontend
 
-The **working** frontend today is the Streamlit app at [`app/streamlit_app.py`](../app/streamlit_app.py)
-(`streamlit run app/streamlit_app.py`) — it already delivers the two required
-tabs (Boardroom, Film Room) against the live SQLite model. Per the project brief,
-Streamlit is the pragmatic alternative; this folder is reserved for the React
-build, scaffolded here so the next phase has a clear contract.
+A Vite + React frontend over the `gridiron` analytics, talking to a thin FastAPI
+JSON layer (`gridiron/api.py`). The Streamlit app (`app/streamlit_app.py`) is
+still the canonical, feature-complete frontend; this is the in-progress React
+port, kicked off with the Boardroom and Film Room tabs.
 
-## Planned structure (Vite + React)
+## Run it (two processes)
+
+**1. The API** (from the repo root):
+
+```bash
+PYTHONPATH=. .venv/bin/python -m uvicorn gridiron.api:app --reload --port 8000
+```
+
+**2. The dev server** (from `frontend/`):
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 — Vite proxies `/api/*` to the API on :8000, so
+there's no CORS setup in dev. Point at a different API with
+`GRIDIRON_API_URL=… npm run dev`.
+
+The Film Room's "Write the film report" button calls Anthropic, so the API
+process needs `ANTHROPIC_API_KEY` in its environment; everything else works
+without a key.
+
+## Structure
 
 ```
 frontend/
 ├── index.html
-├── package.json
-├── vite.config.js
+├── vite.config.js            # react plugin + /api dev proxy
 └── src/
     ├── main.jsx
-    ├── App.jsx                 # tab shell: <Boardroom/> | <FilmRoom/>
-    ├── api/client.js           # fetch wrapper around the JSON API below
+    ├── App.jsx               # tab shell: <Boardroom/> | <FilmRoom/>
+    ├── styles.css            # dark analytics theme (CSS variables)
+    ├── api/client.js         # fetch wrapper around the JSON API
+    ├── lib/useAsync.js       # loading/error/data hook
     ├── components/
-    │   ├── Tabs.jsx
-    │   ├── ChampionPremiumChart.jsx
+    │   ├── Async.jsx                 # loading/error/empty wrapper
+    │   ├── ChampionPremiumChart.jsx  # recharts diverging bar
+    │   ├── EfficiencyVerdictTable.jsx
     │   ├── TeamSpendingExplorer.jsx
-    │   ├── ArchetypeTable.jsx
-    │   └── FilmBreakdown.jsx
+    │   └── ArchetypeTable.jsx
     └── tabs/
         ├── Boardroom.jsx
         └── FilmRoom.jsx
 ```
 
-## API contract (to be served by a small FastAPI layer over `gridiron`)
-
-A thin `gridiron/api.py` (FastAPI) would expose the already-built analytics:
+## API contract (served by `gridiron/api.py`)
 
 | Method | Route                              | Backed by |
 |--------|------------------------------------|-----------|
+| GET    | `/api/meta`                        | seasons / teams / current season (dropdowns) |
 | GET    | `/api/champion-premium`            | `cap_efficiency.champion_premium()` |
 | GET    | `/api/efficiency-verdict`          | `cap_efficiency.efficiency_verdict()` |
-| GET    | `/api/team-season/{team}/{season}` | `positional_spending` table |
+| GET    | `/api/team-season/{team}/{season}` | `positional_spending` + `player_year_caps` |
 | GET    | `/api/archetypes?k=5`              | `clustering.cluster_archetypes()` |
-| POST   | `/api/film/breakdown`              | `pbp_metrics` + `breakdown.generate_breakdown()` |
+| GET    | `/api/film/games?season=`          | `schedules.list_games()` |
+| GET    | `/api/film/summary?season=&game_id=` | `pbp_metrics.build_breakdown_payload()` (no LLM) |
+| POST   | `/api/film/breakdown`              | `breakdown.generate_breakdown()` (Anthropic) |
 
-The analytics functions already return tidy DataFrames, so each route is a
-`.to_dict(orient="records")` away. Build order: FastAPI layer → `api/client.js`
-→ port each Streamlit panel to its React component.
-```
-```
+## Not yet ported
+
+The Streamlit app has two more tabs and several rich Plotly views still to
+bring across: the **Super Bowl Maxer** (field diagram, roster-gap grades, free-
+agent fits), the **Value Board** (best/worst contracts), and the Boardroom's
+cap gauge / spending donut / SB-blueprint radar overlay. Build order for each:
+add its route to `gridiron/api.py`, then its component under `src/`.
