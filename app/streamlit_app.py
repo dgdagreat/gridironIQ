@@ -248,6 +248,23 @@ def boardroom_tab() -> None:
                    else seasons[0])
     season = c2.selectbox("Season", seasons, index=seasons.index(_def_season),
                           key="br_season")
+    compare_teams = st.multiselect(
+        "Compare cap efficiency", teams, default=[team], max_selections=6,
+        key="br_compare_teams",
+        help="Select up to six teams to compare normalized position cap shares.")
+    if compare_teams:
+        _comparison = db.query(
+            "SELECT team, pos_group, cap_pct_norm FROM positional_spending "
+            "WHERE season = :s AND team IN (" + ",".join(
+                f":team_{i}" for i in range(len(compare_teams))) + ")",
+            s=season, **{f"team_{i}": t for i, t in enumerate(compare_teams)})
+        if not _comparison.empty:
+            import plotly.express as px
+            fig = px.line(_comparison, x="pos_group", y="cap_pct_norm", color="team",
+                          markers=True, title=f"{season} cap share by position")
+            fig.update_yaxes(tickformat=".0%", title="Share of team cap")
+            fig.update_xaxes(title=None)
+            st.plotly_chart(fig, use_container_width=True)
     if season > config.CURRENT_SEASON:
         st.info(f"⏳ **{season} is a projection** — only cap already tied up in "
                 "signed multi-year contracts. Rosters aren't full this far out, so "
@@ -390,7 +407,8 @@ def film_room_tab() -> None:
                "play-by-play (~40 MB/season) loads on first use.")
 
     c1, c2 = st.columns(2)
-    season = c1.selectbox("Season", [2026, 2025, 2024, 2023], index=0, key="fr_season")
+    fr_seasons = list(range(config.CURRENT_SEASON, config.CURRENT_SEASON - 4, -1))
+    season = c1.selectbox("Season", fr_seasons, index=0, key="fr_season")
     try:
         sched = _schedule(int(season))
     except Exception as exc:  # noqa: BLE001
@@ -417,26 +435,69 @@ def film_room_tab() -> None:
         with st.spinner(f"Loading {season} play-by-play…"):
             pbp = _pbp(int(season))
         payload = pbp_metrics.build_breakdown_payload(pbp, game["game_id"])
-        lo = payload["losing_offense"]
-        st.markdown(f"**{payload['winner']} def. {payload['loser']}** — "
-                    f"why {payload['loser']} lost")
-        m = st.columns(4)
-        m[0].metric(f"{payload['loser']} EPA/play", lo["epa_per_play"])
-        m[1].metric("Pass EPA", lo["pass_epa"])
-        m[2].metric("Sacks allowed", lo["sacks_allowed"])
-        m[3].metric("Turnovers", lo["turnovers"])
+        if payload["tie"]:
+            st.markdown(f"**{game['away_team']} and {game['home_team']} tied**")
+        else:
+            lo = payload["losing_offense"]
+            st.markdown(f"**{payload['winner']} def. {payload['loser']}** — "
+                        f"why {payload['loser']} lost")
+            m = st.columns(4)
+            m[0].metric(f"{payload['loser']} EPA/play", lo["epa_per_play"])
+            m[1].metric("Pass EPA", lo["pass_epa"])
+            m[2].metric("Sacks allowed", lo["sacks_allowed"])
+            m[3].metric("Turnovers", lo["turnovers"])
+        away, home = game["away_team"], game["home_team"]
+        offense_rows = ([payload["away_offense"], payload["home_offense"]]
+                        if payload["tie"] else
+                        [payload["losing_offense"], payload["winning_offense"]])
+        summary = pd.DataFrame(offense_rows).set_index("team").reindex([away, home]).reset_index()
+        summary = summary.rename(columns={
+            "epa_per_play": "EPA/play", "success_rate": "Success rate",
+            "sacks_allowed": "Sacks", "turnovers": "Turnovers",
+            "explosive_play_rate": "Explosive play rate", "plays": "Plays",
+        })
+        st.markdown("##### Game overview")
+        st.dataframe(summary[["team", "Plays", "EPA/play", "Success rate",
+                              "Sacks", "Turnovers", "Explosive play rate"]],
+                     hide_index=True, use_container_width=True)
+        plays = pbp[(pbp["game_id"] == game["game_id"])
+                    & pbp["play_type"].isin(["pass", "run"])].copy()
+        if not plays.empty and {"epa", "posteam"}.issubset(plays.columns):
+            import plotly.express as px
+            if "play_id" in plays:
+                plays = plays.sort_values("play_id")
+            plays["play_number"] = range(1, len(plays) + 1)
+            plays["cumulative_epa"] = plays.groupby("posteam")["epa"].cumsum()
+            fig = px.line(plays, x="play_number", y="cumulative_epa", color="posteam",
+                          title="Cumulative offensive EPA by play",
+                          labels={"play_number": "Play", "cumulative_epa": "Cumulative EPA",
+                                  "posteam": "Offense"})
+            fig.add_hline(y=0, line_color="#888", line_dash="dot")
+            st.plotly_chart(fig, use_container_width=True)
+            with st.expander("Play-by-play detail"):
+                cols = [c for c in ("posteam", "qtr", "quarter_seconds_remaining", "down",
+                                    "ydstogo", "desc", "yards_gained", "epa") if c in plays]
+                st.dataframe(plays[cols], hide_index=True, use_container_width=True)
         with st.expander("Extracted metrics + player attribution"):
             st.json(payload)
-        if st.button("Generate post-game breakdown", type="primary"):
+        if not payload["tie"] and st.button("Generate post-game breakdown", type="primary"):
             _run_report(breakdown, payload)
     else:
-        form_season = int(season) - 1   # offseason: last completed season's form
+        # In an active season, use only games completed before this matchup.
+        # Week 1 and future-season previews have no current-season sample yet.
+        if int(season) == config.CURRENT_SEASON and int(game["week"]) > 1:
+            form_season = int(season)
+            through_week = int(game["week"]) - 1
+        else:
+            form_season = int(season) - 1
+            through_week = None
         with st.spinner(f"Loading {form_season} form…"):
             form_pbp = _pbp(form_season)
         strength = _roster_strength() if db.table_exists("roster_strength") else None
         payload = matchup.build_preview_payload(
             game["home_team"], game["away_team"], form_pbp=form_pbp,
-            form_season=form_season, week=int(game["week"]), roster_strength=strength)
+            form_season=form_season, week=int(game["week"]),
+            through_week=through_week, roster_strength=strength)
         st.markdown(f"**{game['away_team']} @ {game['home_team']}** — "
                     f"matchup preview (form: {form_season})")
         if payload["roster_edges"]:
@@ -972,7 +1033,7 @@ def maxer_tab() -> None:
     c1.metric("SB outlook", f"{rep['readiness']:.1f}/100")
     rec = rep.get("season_record")
     c2.metric(f"{meta['roster_season']} record",
-              f"{rec['wins']}–{rec['losses']}" if rec else "—",
+              f"{rec['wins']}–{rec['losses']}–{rec['ties']}" if rec else "—",
               help="This season's results so far — blended into the outlook with a "
                    "weight that grows as more games are played.")
     c3.metric("Roster", f"{rep['roster_readiness']:.0f}")
@@ -1043,7 +1104,8 @@ def maxer_tab() -> None:
     st.divider()
     st.subheader(f"Free agents to fill {team}'s needs")
     if db.table_exists("free_agents"):
-        recs = free_agents.recommend_for_team(team, strength, _free_agents())
+        fa_pool = _free_agents()
+        recs = free_agents.recommend_for_team(team, strength, fa_pool)
         if recs.empty:
             st.caption("No clear free-agent upgrades at the top needs right now.")
         else:
@@ -1054,6 +1116,38 @@ def maxer_tab() -> None:
                 "madden_ovr": st.column_config.NumberColumn(format="%.0f"),
                 "age": st.column_config.NumberColumn(format="%.1f"),
                 "est_apy_$m": st.column_config.NumberColumn("est. $/yr (M)", format="$%.1f")})
+        # The simulator runs off the whole FA pool, so show it whenever the pool
+        # has players — independent of whether there were top-need recommendations.
+        candidate_names = sorted(fa_pool["player"].dropna().unique())
+        if candidate_names:
+            st.markdown("##### Simulate a signing")
+            candidate_name = st.selectbox("Free agent", candidate_names,
+                                          key=f"mx_sim_player_{team}")
+            candidate = fa_pool[fa_pool["player"] == candidate_name].iloc[0]
+            sim_pos = candidate.get("pos_group", "—")
+            sim_apy = candidate.get("est_apy")
+            sim_apy = float(sim_apy) if pd.notna(sim_apy) else 1.0
+            sim_cost = st.number_input("Estimated year-one cap charge ($M)",
+                                       min_value=0.0, value=sim_apy, step=0.5,
+                                       key=f"mx_sim_cost_{team}")
+            cap = config.LEAGUE_SALARY_CAP.get(config.CURRENT_SEASON)
+            spend = db.query(
+                "SELECT COALESCE(SUM(cap_dollars), 0) AS committed "
+                "FROM positional_spending WHERE team=:t AND season=:s",
+                t=team, s=config.CURRENT_SEASON)
+            committed = float(spend.iloc[0]["committed"])
+            if cap:
+                space = cap - committed
+                st.metric("Projected cap remaining",
+                          f"${(space - sim_cost * 1_000_000):,.0f}",
+                          delta=f"−${sim_cost:,.1f}M signing cost")
+                if sim_cost * 1_000_000 > space:
+                    st.warning("This estimate exceeds the team's unadjusted cap space.")
+            st.caption(f"{candidate_name} · {sim_pos} · talent grade "
+                       f"{float(candidate['talent']):.0%} · estimated APY ${sim_apy:.1f}M. "
+                       "The default cost is the player's prior APY, used as a rough proxy "
+                       "for year-one cap charge. Cap space ignores restructures, roster "
+                       "displacement, incentives, and dead money.")
     else:
         st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
 
@@ -1061,9 +1155,10 @@ def maxer_tab() -> None:
     st.subheader("League-wide SB outlook")
     lt = league[["rank", "team", "outlook", "roster_readiness", "org_score"]].copy()
     lt.insert(2, "grade", lt["outlook"].map(_grade))
-    if {"wins", "losses", "games"}.issubset(league.columns) and int(league["games"].sum()) > 0:
+    if {"wins", "losses", "ties", "games"}.issubset(league.columns) and int(league["games"].sum()) > 0:
         lt.insert(2, "rec", (league["wins"].astype(int).astype(str) + "–"
-                             + league["losses"].astype(int).astype(str)))
+                             + league["losses"].astype(int).astype(str) + "–"
+                             + league["ties"].astype(int).astype(str)))
     st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320,
                  column_config={
                      "rec": st.column_config.TextColumn(f"{config.CURRENT_SEASON}"),
