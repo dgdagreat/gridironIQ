@@ -56,6 +56,32 @@ NICKNAME_TO_CODE: dict[str, str] = {
 }
 
 
+#: The eight NFL divisions → their four franchise codes (canonical). Used to
+#: offer a "whole division" preset wherever teams are compared.
+DIVISIONS: dict[str, list[str]] = {
+    "AFC East": ["BUF", "MIA", "NE", "NYJ"],
+    "AFC North": ["BAL", "CIN", "CLE", "PIT"],
+    "AFC South": ["HOU", "IND", "JAX", "TEN"],
+    "AFC West": ["DEN", "KC", "LV", "LAC"],
+    "NFC East": ["DAL", "NYG", "PHI", "WAS"],
+    "NFC North": ["CHI", "DET", "GB", "MIN"],
+    "NFC South": ["ATL", "CAR", "NO", "TB"],
+    "NFC West": ["ARI", "LAR", "SF", "SEA"],
+}
+
+#: Reverse lookup: franchise code → its division name.
+TEAM_DIVISION: dict[str, str] = {
+    team: div for div, teams in DIVISIONS.items() for team in teams
+}
+
+
+def division_for(team: str | None) -> str | None:
+    """Return the division a canonical team code belongs to (``None`` if unknown)."""
+    if team is None:
+        return None
+    return TEAM_DIVISION.get(str(team).strip().upper())
+
+
 def canonical_team(code: str | float | None) -> str | None:
     """Normalize a raw team value (abbreviation *or* nickname) to a franchise code.
 
