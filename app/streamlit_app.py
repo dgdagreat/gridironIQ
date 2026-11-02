@@ -23,8 +23,14 @@ import streamlit as st
 
 from gridiron import config, db
 from gridiron.ingestion import reference
-from gridiron.modeling import (cap_efficiency, clustering, free_agents,
-                               roster_strength, sb_maxer, value_board)
+from gridiron.modeling import (
+    cap_efficiency,
+    clustering,
+    roster_strength,
+    sb_maxer,
+    trade_market,
+    value_board,
+)
 
 st.set_page_config(page_title="GridironIQ", page_icon="🏈", layout="wide")
 
@@ -168,13 +174,20 @@ def _player_talent() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def _sim_roster_strength(team: str, signed: tuple[str, ...]):
+def _sim_roster_strength(team: str, signed: tuple[str, ...],
+                         traded: tuple[str, ...] = ()):
     """Return ``(sim_roster, sim_strength)`` for the live roster builder: the
-    ``signed`` free agents added to ``team`` as starters, then unit strength
-    recomputed across the whole league. With no signings this equals the
-    baseline (the precomputed table matches a fresh recompute exactly). Cached on
-    the ``(team, signings)`` pair so dragging the selector stays snappy."""
+    ``signed`` free agents **added** and the ``traded`` players (by ``gsis_id``,
+    pulled off their current roster) **moved** onto ``team`` as starters, then
+    unit strength recomputed across the whole league. With nothing selected this
+    equals the baseline (the precomputed table matches a fresh recompute exactly).
+    Cached on ``(team, signings, trades)`` so clicking stays snappy."""
     players = _player_talent().copy()
+    if traded:
+        m = players["gsis_id"].isin(traded)
+        players.loc[m, "team"] = team            # a trade moves him off his old team
+        players.loc[m, "depth_rank"] = 0
+        players.loc[m, "currently_out"] = False
     if signed:
         fa = _free_agents()
         adds = fa[fa["player"].isin(signed)].copy()
@@ -183,9 +196,10 @@ def _sim_roster_strength(team: str, signed: tuple[str, ...]):
             adds["depth_rank"] = 0          # a signing slots in as the starter
             adds["currently_out"] = False
             players = pd.concat([players, adds], ignore_index=True)
-            # Recompute each player's percentile-among-starters so the new signing
-            # shades correctly on the field and nobody's grade goes stale.
-            players["talent_pct"] = _individual_pct(players)
+    if signed or traded:
+        # Recompute each player's percentile-among-starters so new additions shade
+        # correctly on the field and nobody's grade goes stale.
+        players["talent_pct"] = _individual_pct(players)
     strength = roster_strength.compute_unit_strength(players)
     return players, strength
 
@@ -732,6 +746,7 @@ def _blueprint_radar(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: 
     champion outline (grey, dotted) = over-invested there; caving inside it =
     under-invested. The diverging bar beside it carries the exact gaps."""
     import plotly.graph_objects as go
+
     from gridiron.ingestion.reference import POSITION_GROUP_ORDER
     champ = prem.set_index("pos_group")["champion_avg"]
     team_share = prof.set_index("pos_group")["cap_pct_norm"]
@@ -1097,43 +1112,87 @@ def maxer_tab() -> None:
                         index=teams.index("KC") if "KC" in teams else 0)
     base_rep = sb_maxer.team_report(team, base_strength)
 
-    # ---- Team builder: sign free agents and watch the roster update live ----
+    # ---- Team builder: click players on the boards to sign / trade for them ----
+    st.markdown("##### 🛠️ Build your team")
+    st.caption("**Click players on the boards below** to add them — free agents "
+               "cost cap, trades cost a draft pick. The field, unit grades and SB "
+               "outlook update live; deltas show the change vs. the current roster.")
+    base_needs = list(base_rep["needs"]["pos_group"])
     signed: list[str] = []
+    traded: list[str] = []
     total_cost = 0.0
-    if db.table_exists("free_agents"):
-        fa_pool = _free_agents()
-        need_order = {p: i for i, p in enumerate(base_rep["needs"]["pos_group"])}
-        fa_sorted = fa_pool.assign(
-            _nr=fa_pool["pos_group"].map(need_order).fillna(99)
-        ).sort_values(["_nr", "talent"], ascending=[True, False])
-        fa_label: dict[str, str] = {}
-        for r in fa_sorted.itertuples():
-            cost = f" · ~${float(r.est_apy):.1f}M" if pd.notna(getattr(r, "est_apy", None)) else ""
-            fa_label[f"{r.player} · {r.pos_group} · {float(r.talent):.0%}{cost}"] = r.player
-        st.markdown("##### 🛠️ Build your team — sign free agents")
-        picks = st.multiselect(
-            "Add free agents (your need positions are listed first)",
-            list(fa_label), key=f"mx_signings_{team}",
-            help="Each signing slots in as a starter; the field, unit grades, and "
-                 "SB outlook below all update live. Deltas show the change vs. the "
-                 "current roster.")
-        signed = [fa_label[p] for p in picks]
-        if signed:
-            _s = fa_pool[fa_pool["player"].isin(signed)]
-            total_cost = float(pd.to_numeric(_s.get("est_apy"), errors="coerce").fillna(0).sum())
+    trade_summ: list[str] = []
+    bcol1, bcol2 = st.columns(2)
 
-    # Recompute the roster + league strength with the signings folded in.
-    sim_roster, strength = _sim_roster_strength(team, tuple(sorted(signed)))
+    with bcol1:
+        st.markdown("**🟢 Free agents** — click to sign")
+        if db.table_exists("free_agents"):
+            fa_pool = _free_agents()
+            need_order = {p: i for i, p in enumerate(base_needs)}
+            fa_tbl = (fa_pool.assign(_nr=fa_pool["pos_group"].map(need_order).fillna(99))
+                      .sort_values(["_nr", "talent"], ascending=[True, False])
+                      .reset_index(drop=True))
+            fa_tbl["talent%"] = (pd.to_numeric(fa_tbl["talent"], errors="coerce") * 100).round(0)
+            ev = st.dataframe(
+                fa_tbl[["player", "pos_group", "age", "madden_ovr", "talent%", "est_apy"]],
+                hide_index=True, use_container_width=True, height=300,
+                key=f"fa_board_{team}", on_select="rerun", selection_mode="multi-row",
+                column_config={
+                    "pos_group": st.column_config.TextColumn("pos"),
+                    "age": st.column_config.NumberColumn(format="%.0f"),
+                    "madden_ovr": st.column_config.NumberColumn("OVR", format="%.0f"),
+                    "talent%": st.column_config.NumberColumn(format="%.0f"),
+                    "est_apy": st.column_config.NumberColumn("$/yr (M)", format="$%.1f")})
+            rows = ev.selection["rows"] if ev and ev.selection else []
+            if rows:
+                sel = fa_tbl.iloc[rows]
+                signed = sel["player"].tolist()
+                total_cost = float(pd.to_numeric(sel["est_apy"], errors="coerce").fillna(0).sum())
+        else:
+            st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
+
+    with bcol2:
+        st.markdown("**🔄 Trade targets** — click to trade for")
+        tb = (trade_market.trade_board(_player_talent(), team, base_needs, per_need=6)
+              if db.table_exists("player_talent") else pd.DataFrame())
+        if tb.empty:
+            st.caption("No clear trade targets at your top needs right now.")
+        else:
+            tb = tb.reset_index(drop=True)
+            tb["talent%"] = (pd.to_numeric(tb["talent"], errors="coerce") * 100).round(0)
+            ev2 = st.dataframe(
+                tb[["player", "team", "pos_group", "age", "madden_ovr", "talent%", "pick_tier"]],
+                hide_index=True, use_container_width=True, height=300,
+                key=f"trade_board_{team}", on_select="rerun", selection_mode="multi-row",
+                column_config={
+                    "team": st.column_config.TextColumn("from"),
+                    "pos_group": st.column_config.TextColumn("pos"),
+                    "age": st.column_config.NumberColumn(format="%.0f"),
+                    "madden_ovr": st.column_config.NumberColumn("OVR", format="%.0f"),
+                    "talent%": st.column_config.NumberColumn(format="%.0f"),
+                    "pick_tier": st.column_config.TextColumn("est. cost (pick)")})
+            rows2 = ev2.selection["rows"] if ev2 and ev2.selection else []
+            if rows2:
+                selt = tb.iloc[rows2]
+                traded = selt["gsis_id"].tolist()
+                trade_summ = [f"{r.player} (≈ {r.pick_tier})" for r in selt.itertuples()]
+    st.caption("Trade-pick values are an analytical estimate from caliber, age and "
+               "position — not a live market (contract, cap and the other team's "
+               "willingness aren't modeled).")
+
+    # Recompute the roster + league strength with signings and trades folded in.
+    sim_roster, strength = _sim_roster_strength(
+        team, tuple(sorted(signed)), tuple(sorted(traded)))
     rep = sb_maxer.team_report(team, strength)
     league = sb_maxer.league_table(strength)
 
     prev_season = int(meta["roster_season"]) - 1
     prev = _prior_rank(prev_season).get(team)
     cur = rep["rank"]
-    signed_on = bool(signed)
+    moves_on = bool(signed or traded)
 
     def _delta(now: float, base: float, fmt: str = "{:+.1f}") -> str | None:
-        return fmt.format(now - base) if signed_on else None
+        return fmt.format(now - base) if moves_on else None
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("SB outlook", f"{rep['readiness']:.1f}/100",
@@ -1146,13 +1205,14 @@ def maxer_tab() -> None:
     c3.metric("Roster", f"{rep['roster_readiness']:.0f}",
               delta=_delta(rep["roster_readiness"], base_rep["roster_readiness"], "{:+.0f}"))
     c4.metric("Organization", f"{rep['org_score']:.0f}")
-    if signed_on:
-        move = base_rep["rank"] - cur                    # +ve = climbed with signings
+    if moves_on:
+        move = base_rep["rank"] - cur                    # +ve = climbed with moves
+        n_moves = len(signed) + len(traded)
         c5.metric(f"Predicted rank ({meta['roster_season']})",
                   f"#{cur} of {rep['n_teams']}",
-                  delta=(f"{move:+d} with signings" if move else "no rank change"),
+                  delta=(f"{move:+d} with moves" if move else "no rank change"),
                   delta_color=("normal" if move else "off"),
-                  help=f"Projected rank after your {len(signed)} signing(s), vs. "
+                  help=f"Projected rank after your {n_moves} move(s), vs. "
                        f"#{base_rep['rank']} with the current roster.")
     elif prev:
         move = prev - cur                                # +ve = climbed the board
@@ -1166,23 +1226,27 @@ def maxer_tab() -> None:
     else:
         c5.metric(f"Predicted rank ({meta['roster_season']})",
                   f"#{cur} of {rep['n_teams']}")
-    if signed_on:
-        cap = config.LEAGUE_SALARY_CAP.get(config.CURRENT_SEASON)
-        committed = float(db.query(
-            "SELECT COALESCE(SUM(cap_dollars),0) AS c FROM positional_spending "
-            "WHERE team=:t AND season=:s", t=team, s=config.CURRENT_SEASON).iloc[0]["c"])
-        space_line = ""
-        if cap:
-            remaining = cap - committed - total_cost * 1_000_000
-            # Escape the $ so Streamlit doesn't read it as a LaTeX math delimiter.
-            space_line = (f"  ·  est. cap left: **\\${remaining / 1e6:,.0f}M**"
-                          + ("  ⚠️ over cap" if remaining < 0 else ""))
-        st.success(
-            f"✍️ Signed **{len(signed)}** — {', '.join(signed)}  ·  "
-            f"est. cost **\\${total_cost:,.1f}M/yr**{space_line}", icon="🛠️")
-        st.caption("Signings slot in as starters and recompute every unit grade, "
-                   "the field below, and the SB outlook live. Cap is a rough proxy "
-                   "(prior APY; ignores restructures, displacement, dead money).")
+    if moves_on:
+        bits: list[str] = []
+        if signed:
+            cap = config.LEAGUE_SALARY_CAP.get(config.CURRENT_SEASON)
+            committed = float(db.query(
+                "SELECT COALESCE(SUM(cap_dollars),0) AS c FROM positional_spending "
+                "WHERE team=:t AND season=:s", t=team, s=config.CURRENT_SEASON).iloc[0]["c"])
+            cap_bit = ""
+            if cap:
+                remaining = cap - committed - total_cost * 1_000_000
+                # Escape the $ so Streamlit doesn't read it as a LaTeX math delimiter.
+                cap_bit = (f", est. cap left **\\${remaining / 1e6:,.0f}M**"
+                           + ("  ⚠️ over cap" if remaining < 0 else ""))
+            bits.append(f"✍️ **Signed {len(signed)}** ({', '.join(signed)}) — "
+                        f"est. cost **\\${total_cost:,.1f}M/yr**{cap_bit}")
+        if traded:
+            bits.append(f"🔄 **Traded for {len(traded)}** — {', '.join(trade_summ)}")
+        st.success("  \n".join(bits), icon="🛠️")
+        st.caption("Moves slot in as starters and recompute every unit grade, the "
+                   "field below, and the SB outlook live. Cap and pick costs are "
+                   "rough estimates (prior APY; caliber/age/position), not a live market.")
     st.caption(
         f"Biggest needs: **{', '.join(rep['top_needs']) or '—'}**  ·  "
         "Outlook = roster talent + organization pre-season, then **increasingly "
@@ -1233,24 +1297,6 @@ def maxer_tab() -> None:
                          "gap": st.column_config.NumberColumn("gap", format="%.0f"),
                          "priority": st.column_config.NumberColumn("priority", format="%.0f"),
                      })
-
-    st.divider()
-    st.subheader(f"Free agents to fill {team}'s needs")
-    if db.table_exists("free_agents"):
-        recs = free_agents.recommend_for_team(team, strength, _free_agents())
-        if recs.empty:
-            st.caption("No clear free-agent upgrades at the top needs right now.")
-        else:
-            st.caption("Best available players (not on a current roster) at each "
-                       "remaining top need, ranked by age/trend-adjusted talent. "
-                       "**Sign any of them in the 🛠️ *Build your team* picker up "
-                       "top** to see the field, grades, and SB outlook update live.")
-            st.dataframe(recs, hide_index=True, column_config={
-                "madden_ovr": st.column_config.NumberColumn(format="%.0f"),
-                "age": st.column_config.NumberColumn(format="%.1f"),
-                "est_apy_$m": st.column_config.NumberColumn("est. $/yr (M)", format="$%.1f")})
-    else:
-        st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
 
     st.divider()
     st.subheader("League-wide SB outlook")
