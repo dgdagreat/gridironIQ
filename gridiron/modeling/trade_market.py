@@ -21,7 +21,7 @@ import pandas as pd
 #: Positional market premium for trade value. QB commands the market; edge,
 #: receiver, tackle and corner carry a premium; specialists bring up the rear.
 TRADE_POS_MULT: dict[str, float] = {
-    "QB": 1.60, "EDGE": 1.25, "WR": 1.20, "OL": 1.15, "CB": 1.15,
+    "QB": 1.60, "EDGE": 1.25, "WR": 1.20, "T": 1.15, "G": 1.15, "C": 1.15, "OL": 1.15, "CB": 1.15,
     "IDL": 1.05, "S": 0.95, "TE": 0.90, "LB": 0.80, "RB": 0.70, "SPEC": 0.40,
 }
 _MAX_MULT = 1.60

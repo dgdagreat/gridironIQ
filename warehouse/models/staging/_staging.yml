@@ -17,7 +17,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: [QB, RB, WR, TE, OL, IDL, EDGE, LB, CB, S, SPEC, UNK]
+                values: [QB, RB, WR, TE, T, G, C, OL, IDL, EDGE, LB, CB, S, SPEC, UNK]
       - name: cap_pct
         description: Share of the season's league cap (must be a valid 0..1 fraction).
         data_tests:

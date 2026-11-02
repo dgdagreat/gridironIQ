@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Connection, Engine, create_engine, text
 
 from gridiron import config
 
@@ -28,11 +28,14 @@ def get_engine() -> Engine:
     return _engine
 
 
-def run_sql_script(path: str | Path) -> None:
-    """Execute a multi-statement ``.sql`` file (e.g. the schema DDL)."""
+def run_sql_script(path: str | Path, *, connection: Connection | None = None) -> None:
+    """Execute a SQL script, optionally inside a caller-owned transaction."""
     sql = Path(path).read_text()
-    engine = get_engine()
-    with engine.begin() as conn:
+    if connection is not None:
+        for statement in _split_statements(sql):
+            connection.execute(text(statement))
+        return
+    with get_engine().begin() as conn:
         for statement in _split_statements(sql):
             conn.execute(text(statement))
 
@@ -55,9 +58,11 @@ def _split_statements(sql: str) -> list[str]:
     return [stmt.strip() for stmt in joined.split(";") if stmt.strip()]
 
 
-def write_table(df: pd.DataFrame, table: str, if_exists: str = "replace") -> int:
-    """Persist a DataFrame to ``table``; returns the row count written."""
-    df.to_sql(table, get_engine(), if_exists=if_exists, index=False)
+def write_table(df: pd.DataFrame, table: str, if_exists: str = "replace",
+                *, connection: Connection | None = None) -> int:
+    """Persist a DataFrame to ``table``; optionally join an existing transaction."""
+    target = connection if connection is not None else get_engine()
+    df.to_sql(table, target, if_exists=if_exists, index=False)
     return len(df)
 
 

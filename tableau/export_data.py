@@ -22,11 +22,12 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 POS_LABEL = {
     "QB": "Quarterback", "RB": "Running Back", "WR": "Wide Receiver",
-    "TE": "Tight End", "OL": "Offensive Line", "IDL": "Interior D-Line",
+    "TE": "Tight End", "T": "Offensive Tackle", "G": "Offensive Guard",
+    "C": "Center", "OL": "Offensive Line", "IDL": "Interior D-Line",
     "EDGE": "Edge Rusher", "LB": "Linebacker", "CB": "Cornerback",
     "S": "Safety", "SPEC": "Special Teams",
 }
-PCT_COLS = ["pct_qb", "pct_rb", "pct_wr", "pct_te", "pct_ol", "pct_idl",
+PCT_COLS = ["pct_qb", "pct_rb", "pct_wr", "pct_te", "pct_t", "pct_g", "pct_c", "pct_ol", "pct_idl",
             "pct_edge", "pct_lb", "pct_cb", "pct_s", "pct_spec"]
 
 

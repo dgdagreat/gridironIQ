@@ -2,8 +2,8 @@
 Cap ETL orchestration: contracts -> tidy tables -> SQLite + processed extracts.
 
 ``run_etl()`` is the single entry point the CLI script and tests call. It is
-idempotent: the schema is dropped/recreated each run, so re-running fully
-refreshes the Boardroom data layer.
+idempotent and replaces the SQLite tables and views in one transaction, preserving
+the prior complete dataset if any part of the refresh fails.
 """
 
 from __future__ import annotations
@@ -55,15 +55,22 @@ def run_etl(force_download: bool = False, save_processed: bool = True) -> dict:
     features = cap_data.build_spending_features(spending)
     league, super_bowls, outcomes = build_reference_tables()
 
-    # ---- load into SQLite: schema -> tables -> views ----
-    db.run_sql_script(config.SQL_DIR / "01_schema.sql")
-    db.write_table(league, "league_cap", if_exists="append")
-    db.write_table(super_bowls, "super_bowls", if_exists="append")
-    db.write_table(outcomes, "team_outcomes", if_exists="append")
-    db.write_table(player_year[_PYC_COLS], "player_year_caps", if_exists="append")
-    db.write_table(spending, "positional_spending", if_exists="append")
-    db.write_table(features, "spending_features", if_exists="append")
-    db.run_sql_script(config.SQL_DIR / "02_views.sql")
+    # ---- atomically replace SQLite tables + views ----
+    # SQLite DDL is transactional. Keep the old complete dataset visible unless
+    # every table and view has been recreated successfully.
+    with db.get_engine().begin() as conn:
+        # pysqlite can defer opening the DBAPI transaction until the first DML;
+        # issue BEGIN explicitly so the initial DROP/CREATE statements roll back too.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        db.run_sql_script(config.SQL_DIR / "01_schema.sql", connection=conn)
+        db.write_table(league, "league_cap", if_exists="append", connection=conn)
+        db.write_table(super_bowls, "super_bowls", if_exists="append", connection=conn)
+        db.write_table(outcomes, "team_outcomes", if_exists="append", connection=conn)
+        db.write_table(player_year[_PYC_COLS], "player_year_caps", if_exists="append",
+                       connection=conn)
+        db.write_table(spending, "positional_spending", if_exists="append", connection=conn)
+        db.write_table(features, "spending_features", if_exists="append", connection=conn)
+        db.run_sql_script(config.SQL_DIR / "02_views.sql", connection=conn)
     log.info("Loaded all tables + views into %s", config.DB_PATH)
 
     if save_processed:

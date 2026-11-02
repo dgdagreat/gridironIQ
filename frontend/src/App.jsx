@@ -4,10 +4,14 @@ import { useAsync } from './lib/useAsync.js'
 import { Async } from './components/Async.jsx'
 import { Boardroom } from './tabs/Boardroom.jsx'
 import { FilmRoom } from './tabs/FilmRoom.jsx'
+import { Maxer } from './tabs/Maxer.jsx'
+import { ValueBoard } from './tabs/ValueBoard.jsx'
 
 const TABS = [
   { id: 'boardroom', label: 'Boardroom' },
   { id: 'filmroom', label: 'Film Room' },
+  { id: 'maxer', label: 'Super Bowl Maxer' },
+  { id: 'valueboard', label: 'Value Board' },
 ]
 
 export default function App() {
@@ -37,7 +41,9 @@ export default function App() {
       <main>
         <Async state={meta}>
           {(m) => (
-            tab === 'boardroom' ? <Boardroom meta={m} /> : <FilmRoom meta={m} />
+            tab === 'boardroom' ? <Boardroom meta={m} />
+              : tab === 'filmroom' ? <FilmRoom meta={m} />
+                : tab === 'maxer' ? <Maxer meta={m} /> : <ValueBoard />
           )}
         </Async>
       </main>

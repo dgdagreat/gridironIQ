@@ -67,7 +67,8 @@ def _verdict() -> pd.DataFrame:
 
 #: Full position names for display (match the Tableau dashboard's labels).
 _POS_FULL = {"QB": "Quarterback", "RB": "Running Back", "WR": "Wide Receiver",
-             "TE": "Tight End", "OL": "Offensive Line", "IDL": "Interior D-Line",
+             "TE": "Tight End", "T": "Offensive Tackle", "G": "Offensive Guard",
+             "C": "Center", "OL": "Offensive Line", "IDL": "Interior D-Line",
              "EDGE": "Edge Rusher", "LB": "Linebacker", "CB": "Cornerback",
              "S": "Safety", "SPEC": "Special Teams"}
 
@@ -604,7 +605,8 @@ def film_room_tab() -> None:
 #: Position groups → unit, for coloring the cap-allocation chart. Lets the O/D
 #: cap balance read at a glance on top of the per-position shares.
 _POS_UNIT = {
-    "QB": "Offense", "RB": "Offense", "WR": "Offense", "TE": "Offense", "OL": "Offense",
+    "QB": "Offense", "RB": "Offense", "WR": "Offense", "TE": "Offense", "T": "Offense",
+    "G": "Offense", "C": "Offense", "OL": "Offense",
     "IDL": "Defense", "EDGE": "Defense", "LB": "Defense", "CB": "Defense", "S": "Defense",
     "SPEC": "Special teams",
 }
@@ -875,8 +877,8 @@ def _style_grades(df: pd.DataFrame, cols: list[str]):
 _FORMATION: list[tuple[str, str, float, float, str | None]] = [
     # OFFENSE — 11 personnel shotgun (X/Z split wide, slot inside), driving up
     ("X", "WR", 3, 42.5, None), ("Z", "WR", 50, 42.5, None), ("SLOT", "WR", 10, 41, None),
-    ("LT", "OL", 16, 44, "T"), ("LG", "OL", 21, 44, "G"), ("C", "OL", 26.5, 44, "C"),
-    ("RG", "OL", 32, 44, "G"), ("RT", "OL", 37, 44, "T"),
+    ("LT", "T", 16, 44, "T"), ("LG", "G", 21, 44, "G"), ("C", "C", 26.5, 44, "C"),
+    ("RG", "G", 32, 44, "G"), ("RT", "T", 37, 44, "T"),
     ("TE", "TE", 42, 44, None),
     ("QB", "QB", 25, 38, None), ("RB", "RB", 31, 38, None),
     # DEFENSE — nickel (4-2-5): NB (nickel back) is the 3rd CB, over the slot

@@ -16,7 +16,7 @@ import pandas as pd
 
 #: How many players define a "unit" at each position (starters + key rotation).
 UNIT_SIZE: dict[str, int] = {
-    "QB": 1, "RB": 2, "WR": 4, "TE": 2, "OL": 5, "IDL": 4,
+    "QB": 1, "RB": 2, "WR": 4, "TE": 2, "T": 2, "G": 2, "C": 1, "OL": 5, "IDL": 4,
     "EDGE": 4, "LB": 4, "CB": 4, "S": 3, "SPEC": 3,
 }
 #: Talent baseline for unrated players (rookies/UDFAs with no grade yet).
@@ -32,7 +32,10 @@ AGE_CURVE: dict[str, tuple[float, float, float]] = {
     "RB":   (26, 0.070, 0.40),   # earliest + steepest cliff
     "WR":   (27, 0.045, 0.55),
     "TE":   (28, 0.045, 0.55),
-    "OL":   (29, 0.030, 0.60),   # durable; technique outlasts athleticism
+    "T":    (29, 0.030, 0.60),
+    "G":    (29, 0.030, 0.60),
+    "C":    (29, 0.030, 0.60),
+    "OL":   (29, 0.030, 0.60),   # generic source label without a known role
     "IDL":  (28, 0.040, 0.55),
     "EDGE": (28, 0.050, 0.50),   # bend/burst fade with age
     "LB":   (27, 0.055, 0.50),   # speed-dependent

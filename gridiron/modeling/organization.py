@@ -16,15 +16,14 @@ isn't buried beneath teams that merely look good on a Madden depth chart.
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 import pandas as pd
 
+from gridiron import config
 from gridiron.ingestion import schedules
 from gridiron.ingestion.reference import CANONICAL_TEAMS, canonical_team
 
 #: Recency weights — most recent season dominates (a current SB run matters most).
-RECENCY_WEIGHTS: dict[int, float] = {2025: 0.50, 2024: 0.30, 2023: 0.20}
+RECENCY_WEIGHT_VALUES = (0.50, 0.30, 0.20)
 
 # Per-season credit on top of regular-season win rate.
 PLAYOFF_BONUS = 0.15
@@ -32,19 +31,23 @@ SB_APP_BONUS = 0.25
 SB_WIN_BONUS = 0.20
 
 
-@lru_cache(maxsize=2)
 def franchise_strength(weights: dict[int, float] | None = None) -> pd.DataFrame:
     """Per-team organizational score (0–100), recency-weighted.
 
-    Cached per process: it reads the schedule file and is called several times per
-    Maxer render (via league_table / team_report), so memoizing keeps the app snappy.
+    Schedule data is cached with a bounded TTL by :mod:`gridiron.ingestion.schedules`.
+    Default recency weights follow the latest season with a completed Super Bowl.
 
     Columns: team, win_pct (3yr), playoff_seasons, sb_apps, sb_wins, org_score.
     """
-    weights = weights or RECENCY_WEIGHTS
+    sched = schedules.load_schedules()
+    if weights is None:
+        game_type = sched.get("game_type", pd.Series(index=sched.index, dtype="object"))
+        completed = sched.loc[game_type.eq("SB") & sched["home_score"].notna(), "season"]
+        latest = int(completed.max()) if not completed.empty else config.CURRENT_SEASON - 1
+        weights = {latest - offset: value
+                   for offset, value in enumerate(RECENCY_WEIGHT_VALUES)}
     seasons = tuple(weights)
 
-    sched = schedules.load_schedules()
     g = sched[sched["season"].isin(seasons) & sched["home_score"].notna()].copy()
     g["home"] = g["home_team"].map(canonical_team)
     g["away"] = g["away_team"].map(canonical_team)

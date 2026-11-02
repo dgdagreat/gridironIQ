@@ -101,8 +101,23 @@ def run_sql(sql: str, warehouse: Path = WAREHOUSE_PATH) -> QueryResult:
         return QueryResult([], [], 0, error=str(e))
 
     try:
-        con = duckdb.connect(str(warehouse), read_only=True)
+        # The agent only needs the already-landed DuckDB database. Keep its
+        # connection read-only and disable DuckDB's separate filesystem access
+        # surface (read_csv/read_parquet, COPY, ATTACH, remote filesystems), and
+        # cap query resources before locking configuration against user SQL.
+        con = duckdb.connect(
+            str(warehouse), read_only=True,
+            config={"enable_external_access": "false",
+                    "autoinstall_known_extensions": "false",
+                    "autoload_known_extensions": "false",
+                    "max_execution_time": "30000",
+                    "memory_limit": "512MB",
+                    "threads": "2"},
+        )
+        con.execute("SET lock_configuration = true")
     except Exception as e:  # noqa: BLE001 - warehouse missing / locked; surface as an error result
+        if "con" in locals():
+            con.close()
         return QueryResult([], [], 0, error=f"cannot open warehouse: {e}")
     try:
         cur = con.execute(f"SELECT * FROM ({cleaned}) AS _q LIMIT {MAX_ROWS + 1}")

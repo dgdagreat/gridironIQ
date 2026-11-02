@@ -31,7 +31,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: [QB, RB, WR, TE, OL, IDL, EDGE, LB, CB, S, SPEC, UNK]
+                values: [QB, RB, WR, TE, T, G, C, OL, IDL, EDGE, LB, CB, S, SPEC, UNK]
 
   - name: mart_position_success
     description: >

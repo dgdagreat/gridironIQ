@@ -60,14 +60,16 @@ frontend/
 | GET    | `/api/efficiency-verdict`          | `cap_efficiency.efficiency_verdict()` |
 | GET    | `/api/team-season/{team}/{season}` | `positional_spending` + `player_year_caps` |
 | GET    | `/api/archetypes?k=5`              | `clustering.cluster_archetypes()` |
+| GET    | `/api/maxer/{team}`                | roster outlook, needs, free agents, trades |
+| GET    | `/api/value-board?position=&limit=` | best values and overpays |
 | GET    | `/api/film/games?season=`          | `schedules.list_games()` |
 | GET    | `/api/film/summary?season=&game_id=` | `pbp_metrics.build_breakdown_payload()` (no LLM) |
 | POST   | `/api/film/breakdown`              | `breakdown.generate_breakdown()` (Anthropic) |
 
-## Not yet ported
+## Port status
 
-The Streamlit app has two more tabs and several rich Plotly views still to
-bring across: the **Super Bowl Maxer** (field diagram, roster-gap grades, free-
-agent fits), the **Value Board** (best/worst contracts), and the Boardroom's
-cap gauge / spending donut / SB-blueprint radar overlay. Build order for each:
-add its route to `gridiron/api.py`, then its component under `src/`.
+The React shell now includes all four Streamlit tabs. The Maxer includes team
+outlook, position gaps, recommended free agents and trade targets, plus an
+interactive roster simulator and projected starters view. The Value Board
+includes best values and overpays. The Boardroom's cap gauge / spending donut /
+SB-blueprint radar overlay remain to be ported.

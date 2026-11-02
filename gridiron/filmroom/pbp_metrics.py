@@ -17,6 +17,7 @@ These are surfaced as ``None`` with a clear flag rather than faked from YAC.
 from __future__ import annotations
 
 import logging
+import time
 
 import pandas as pd
 import requests
@@ -33,10 +34,12 @@ PBP_URL = (
 CHARTING_METRICS = ("wr_separation", "yards_after_contact")
 
 
-def load_pbp(season: int, force: bool = False, timeout: int = 120) -> pd.DataFrame:
-    """Download (cached) and return one season of nflfastR play-by-play."""
+def load_pbp(season: int, force: bool = False, timeout: int = 120,
+             ttl_hours: float = 1.0) -> pd.DataFrame:
+    """Download and return PBP, refreshing active seasons at the configured TTL."""
     dest = config.RAW_DIR / f"pbp_{season}.parquet"
-    if not dest.exists() or force:
+    stale = not dest.exists() or (time.time() - dest.stat().st_mtime) / 3600 >= ttl_hours
+    if stale or force:
         url = PBP_URL.format(season=season)
         log.info("Downloading play-by-play: %s", url)
         resp = requests.get(url, timeout=timeout)
@@ -146,7 +149,10 @@ def team_form(pbp: pd.DataFrame, team: str, through_week: int | None = None) -> 
         return round(len(ex) / len(frame), 3)
 
     def pressure(frame):
-        db = frame[frame["play_type"] == "pass"]
+        if "qb_dropback" in frame:
+            db = frame[pd.to_numeric(frame["qb_dropback"], errors="coerce").fillna(0).eq(1)]
+        else:
+            db = frame[frame["play_type"] == "pass"]
         if not len(db) or not {"qb_hit", "sack"} <= set(frame.columns):
             return None
         # A dropback is pressured if hit OR sacked — a sack is often also flagged

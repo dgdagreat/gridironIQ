@@ -125,9 +125,13 @@ POSITION_GROUPS: dict[str, str] = {
     "WR": "WR",
     # Tight end
     "TE": "TE",
-    # Offensive line
-    "OL": "OL", "T": "OL", "OT": "OL", "LT": "OL", "RT": "OL",
-    "G": "OL", "OG": "OL", "LG": "OL", "RG": "OL", "C": "OL", "IOL": "OL",
+    # Keep granular offensive line roles separate. Generic source labels remain OL.
+    "OL": "OL", "IOL": "OL",
+    "T": "T", "OT": "T", "LT": "T", "RT": "T",
+    "TACKLE": "T", "OFFENSIVE TACKLE": "T",
+    "G": "G", "OG": "G", "LG": "G", "RG": "G",
+    "GUARD": "G", "OFFENSIVE GUARD": "G",
+    "C": "C", "CENTER": "C", "CENTRE": "C", "OFFENSIVE CENTER": "C",
     # Interior defensive line
     "IDL": "IDL", "DT": "IDL", "NT": "IDL", "DL": "IDL", "DI": "IDL",
     # Edge rushers
@@ -143,7 +147,7 @@ POSITION_GROUPS: dict[str, str] = {
 
 #: Canonical ordering for display / model feature columns.
 POSITION_GROUP_ORDER: list[str] = [
-    "QB", "RB", "WR", "TE", "OL", "IDL", "EDGE", "LB", "CB", "S", "SPEC",
+    "QB", "RB", "WR", "TE", "T", "G", "C", "OL", "IDL", "EDGE", "LB", "CB", "S", "SPEC",
 ]
 
 

@@ -51,7 +51,7 @@ CREATE TABLE positional_spending (
     season       INTEGER,
     team         TEXT,
     era          TEXT,
-    pos_group    TEXT,              -- QB, RB, WR, TE, OL, IDL, EDGE, LB, CB, S, SPEC, UNK
+    pos_group    TEXT,              -- QB, RB, WR, TE, T, G, C, OL, IDL, EDGE, LB, CB, S, SPEC, UNK
     cap_dollars  REAL,
     cap_pct      REAL,             -- sum of player cap shares vs league cap (primary)
     cap_pct_norm REAL,             -- share of the team's accounted cap (era-comparable)
@@ -70,6 +70,9 @@ CREATE TABLE spending_features (
     pct_RB    REAL,
     pct_WR    REAL,
     pct_TE    REAL,
+    pct_T     REAL,
+    pct_G     REAL,
+    pct_C     REAL,
     pct_OL    REAL,
     pct_IDL   REAL,
     pct_EDGE  REAL,

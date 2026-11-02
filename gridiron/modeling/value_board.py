@@ -89,9 +89,11 @@ def best_values(board: pd.DataFrame, *, pos_group: str | None = None,
 
 
 def worst_contracts(board: pd.DataFrame, *, min_pay_pct: float = 50.0,
-                    n: int = 15) -> pd.DataFrame:
+                    n: int = 15, pos_group: str | None = None) -> pd.DataFrame:
     """Biggest overpays -- well-paid players (top-half money) delivering least."""
     b = board[board["pay_pct"] >= min_pay_pct]
+    if pos_group and pos_group != "All":
+        b = b[b["pos_group"] == pos_group]
     return b.sort_values("value_index").head(n).reset_index(drop=True)
 
 

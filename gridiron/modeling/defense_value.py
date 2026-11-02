@@ -24,7 +24,7 @@ from __future__ import annotations
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.inspection import permutation_importance
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.model_selection import GroupKFold, cross_val_score
 
 from gridiron.ingestion.reference import classify_position
 from gridiron.ingestion.rosters import load_weekly_stats
@@ -104,7 +104,8 @@ def build_training_frame(seasons=TRAIN_SEASONS, cutoffs=CUTOFFS) -> pd.DataFrame
                 continue
             if past.idp.sum() / len(past) < MIN_IDP_PER_GAME:
                 continue
-            rows.append({**_features_through_k(past, grp, k), "y": future.idp.mean()})
+            rows.append({**_features_through_k(past, grp, k), "_group": _pid,
+                         "y": future.idp.mean()})
     return pd.DataFrame(rows)
 
 
@@ -126,10 +127,12 @@ def train_value_model(seasons=TRAIN_SEASONS, cutoffs=CUTOFFS,
     from sklearn.metrics import r2_score
     tr = build_training_frame(seasons, cutoffs)
     X, y = _design_matrix(tr), tr["y"]
-    cv = KFold(5, shuffle=True, random_state=random_state)
+    groups = tr["_group"]
+    cv = GroupKFold(n_splits=5)
     model = _new_model(random_state)
-    r2 = cross_val_score(model, X, y, cv=cv, scoring="r2")
-    mae = -cross_val_score(model, X, y, cv=cv, scoring="neg_mean_absolute_error")
+    r2 = cross_val_score(model, X, y, cv=cv, groups=groups, scoring="r2")
+    mae = -cross_val_score(model, X, y, cv=cv, groups=groups,
+                           scoring="neg_mean_absolute_error")
     model.fit(X, y)
     perm = permutation_importance(model, X, y, n_repeats=5,
                                   random_state=random_state, scoring="r2")

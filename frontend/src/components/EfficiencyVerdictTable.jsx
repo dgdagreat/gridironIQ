@@ -1,5 +1,6 @@
 const POS_FULL = {
   QB: 'Quarterback', RB: 'Running Back', WR: 'Wide Receiver', TE: 'Tight End',
+  T: 'Offensive Tackle', G: 'Offensive Guard', C: 'Center',
   OL: 'Offensive Line', IDL: 'Interior D-Line', EDGE: 'Edge Rusher',
   LB: 'Linebacker', CB: 'Cornerback', S: 'Safety', SPEC: 'Special Teams',
 }

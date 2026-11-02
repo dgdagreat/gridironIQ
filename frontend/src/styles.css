@@ -99,8 +99,44 @@ tbody tr:hover { background: var(--bg-elev-2); }
 
 .report { white-space: pre-wrap; line-height: 1.6; font-size: 15px; }
 .muted { color: var(--text-dim); font-size: 13px; }
+.table-scroll { width: 100%; overflow-x: auto; }
+.table-scroll table { min-width: 460px; }
+.panel h3 { margin: 18px 0 8px; font-size: 15px; }
+.stat .value small { color: var(--text-dim); font-size: 13px; font-weight: 500; }
+.delta { color: #3fb950; font-size: 12px; margin-top: 4px; }
+.starter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 8px; margin: 10px 0 18px; }
+.starter { display: flex; flex-direction: column; gap: 3px; padding: 10px; background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.starter b { color: var(--accent); font-size: 11px; }
+.starter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.starter small, .pick-row small { color: var(--text-dim); font-size: 11px; }
+.pick-list { max-height: 410px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.pick-row { display: grid; grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 10px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover, .pick-row.selected { background: var(--bg-elev-2); }
+.pick-row:disabled { opacity: .48; cursor: not-allowed; }
+.pick-row.selected { box-shadow: inset 3px 0 var(--accent); }
+.pick-row span:first-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pick-row em { color: var(--accent); font-style: normal; font-size: 12px; font-weight: 700; white-space: nowrap; }
+button.secondary { margin-top: 14px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev-2); color: var(--text); cursor: pointer; }
+.move-summary { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); font-size: 13px; }
+.field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.field-heading h3 { margin: 18px 0 8px; }
+.mode-toggle { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev-2); }
+.mode-toggle button { border: 0; border-radius: 6px; padding: 6px 10px; background: transparent; color: var(--text-dim); cursor: pointer; font-size: 12px; }
+.mode-toggle button.active { color: var(--text); background: #2d3744; }
+.field-wrap { max-width: 720px; margin: 0 auto 18px; }
+.football-field { display: block; width: 100%; height: auto; overflow: visible; }
+.yard-mark { fill: rgba(255,255,255,.7); font-size: 9px; }
+.field-label { fill: rgba(255,255,255,.92); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.slot-label { fill: #fff; font-size: 8px; font-weight: 800; }
+.player-label { fill: #fff; font-size: 7px; paint-order: stroke; stroke: rgba(0,0,0,.7); stroke-width: 2px; stroke-linejoin: round; }
+.field-legend { display: flex; justify-content: center; gap: 18px; color: var(--text-dim); font-size: 11px; margin-top: 5px; }
+.field-legend span { display: flex; align-items: center; gap: 5px; }
+.field-legend i { width: 9px; height: 9px; border-radius: 3px; }
 
 @media (max-width: 640px) {
   .app-header h1 { font-size: 22px; }
   .tabbar { overflow-x: auto; }
+  .pick-row { grid-template-columns: minmax(110px, 1fr) auto; }
+  .pick-row em { grid-column: 2; }
 }

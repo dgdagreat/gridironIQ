@@ -38,8 +38,9 @@ def _offense(plays: DataFrame, grp: list[str]) -> DataFrame:
 
 def _defense(plays: DataFrame, grp: list[str]) -> DataFrame:
     dropbacks = F.sum(F.coalesce(F.col("qb_dropback").cast("int"), F.lit(0)))
-    pressures = (F.sum(F.coalesce(F.col("qb_hit").cast("int"), F.lit(0)))
-                 + F.sum(F.coalesce(F.col("sack").cast("int"), F.lit(0))))
+    pressured = ((F.coalesce(F.col("qb_hit").cast("int"), F.lit(0)) != 0)
+                 | (F.coalesce(F.col("sack").cast("int"), F.lit(0)) != 0))
+    pressures = F.sum(F.when(pressured, F.lit(1)).otherwise(F.lit(0)))
     return (plays.groupBy(*grp, F.col("defteam").alias("team")).agg(
         F.count("*").alias("def_plays"),
         F.round(F.avg("epa"), 4).alias("def_epa_play_allowed"),

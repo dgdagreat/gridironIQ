@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import time
-from functools import lru_cache
 
 import pandas as pd
 import requests
@@ -21,20 +20,26 @@ log = logging.getLogger(__name__)
 
 SCHEDULE_URL = "https://github.com/nflverse/nfldata/raw/master/data/games.csv"
 DEFAULT_TTL_HOURS = 12
+_SCHEDULE_CACHE: pd.DataFrame | None = None
+_SCHEDULE_CACHE_AT = 0.0
 
 _COLS = ["game_id", "season", "game_type", "week", "gameday",
          "away_team", "home_team", "away_score", "home_score", "result", "status"]
 
 
-@lru_cache(maxsize=2)
 def load_schedules(*, force: bool = False, ttl_hours: float = DEFAULT_TTL_HOURS,
                    timeout: int = 60) -> pd.DataFrame:
     """Return every game (past + scheduled) with a ``status`` column.
 
-    Memoized per process: it's read several times per app render (schedule picker
-    + the org/outlook calc), and re-parsing the file each time stalled the render.
-    The daily refresh runs in a fresh process, so it still re-fetches.
+    Kept in memory only until the TTL expires. Returning a copy prevents callers
+    from mutating the process-wide cached frame.
     """
+    global _SCHEDULE_CACHE, _SCHEDULE_CACHE_AT
+    now = time.monotonic()
+    if (not force and _SCHEDULE_CACHE is not None
+            and (now - _SCHEDULE_CACHE_AT) < ttl_hours * 3600):
+        return _SCHEDULE_CACHE.copy()
+
     dest = config.RAW_DIR / "games.csv"
     stale = not dest.exists() or (time.time() - dest.stat().st_mtime) / 3600 >= ttl_hours
     if stale or force:
@@ -44,7 +49,9 @@ def load_schedules(*, force: bool = False, ttl_hours: float = DEFAULT_TTL_HOURS,
         config.atomic_write(dest, lambda p: p.write_bytes(resp.content))
     df = pd.read_csv(dest, low_memory=False)
     df["status"] = df["result"].notna().map({True: "played", False: "scheduled"})
-    return df
+    _SCHEDULE_CACHE = df
+    _SCHEDULE_CACHE_AT = time.monotonic()
+    return df.copy()
 
 
 def list_games(season: int, week: int | None = None, *,

@@ -33,8 +33,18 @@ def build_silver(spark: SparkSession) -> DataFrame:
     # Keep real scrimmage plays with a measurable outcome.
     df = df.filter(F.col("epa").isNotNull())
     if "play_type" in df.columns:
-        df = df.filter(F.col("play_type").isin("run", "pass", "qb_kneel", "qb_spike")
-                       | F.col("play_type").isNull())
+        # Keep the same scrimmage-play denominator used by Film Room analytics.
+        df = df.filter(F.col("play_type").isin("run", "pass"))
+        is_pass = F.col("play_type") == "pass"
+        is_rush = F.col("play_type") == "run"
+    else:
+        # Older or partial source schemas may omit play_type but retain nflfastR's
+        # pass/rush flags. Require one of those flags rather than guessing.
+        is_pass = (F.coalesce(F.col("pass").cast("int"), F.lit(0)) == 1
+                   if "pass" in df.columns else F.lit(False))
+        is_rush = (F.coalesce(F.col("rush").cast("int"), F.lit(0)) == 1
+                   if "rush" in df.columns else F.lit(False))
+        df = df.filter(is_pass | is_rush)
     df = df.filter(F.col("posteam").isNotNull() & F.col("defteam").isNotNull())
 
     # Numeric casts (nflfastR mixes doubles / strings across years).
@@ -46,13 +56,12 @@ def build_silver(spark: SparkSession) -> DataFrame:
         if c in df.columns:
             df = df.withColumn(c, F.col(c).cast("int"))
 
-    # An explosive play: 20+ pass yards or 10+ rush yards.
-    is_pass = F.coalesce(F.col("pass").cast("int"), F.lit(0)) == 1 \
-        if "pass" in df.columns else F.lit(False)
+    # An explosive play: 20+ pass yards or 10+ rush yards. Do not treat
+    # non-pass events as rushes.
     df = df.withColumn(
         "explosive",
         F.when(is_pass & (F.col("yards_gained") >= 20), F.lit(1))
-         .when(~is_pass & (F.col("yards_gained") >= 10), F.lit(1))
+         .when(is_rush & (F.col("yards_gained") >= 10), F.lit(1))
          .otherwise(F.lit(0)))
 
     df = df.dropDuplicates(["game_id", "play_id"])

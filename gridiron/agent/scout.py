@@ -35,7 +35,9 @@ Key facts about this warehouse (an NFL salary-cap analytics platform):
 - `main.*` are the dbt marts (query these first); `raw.*` are landed source tables.
 - Cap shares (cap_pct, pct_qb, ...) are FRACTIONS of the league cap (0..1), not
   percentages. Multiply by 100 to present a percent.
-- pos_group is one of: QB, RB, WR, TE, OL, IDL, EDGE, LB, CB, S, SPEC, UNK.
+- pos_group is one of: QB, RB, WR, TE, T, G, C, OL, IDL, EDGE, LB, CB, S, SPEC, UNK.
+- T, G, and C are separate tackle, guard, and center groups. OL means a generic
+  source label that did not identify a specific offensive line role.
 - main.mart_position_success is the headline: champion_premium = how much more (or
   less, if negative) Super Bowl winners spend at a position vs. the league average.
 - main.fct_team_season = one row per team-season with positional cap-share features
