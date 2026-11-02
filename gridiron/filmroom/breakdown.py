@@ -65,6 +65,14 @@ rather than inventing them.
 Structure: a headline lean; "Where it's won" (2-3 bulleted edges, each with \
 numbers); then a one-line "Key to winning" for each team. Keep it tight."""
 
+SYSTEM_TIE = """\
+You are a veteran NFL film-room analyst reviewing a game that ended in a tie.
+Compare both teams' play-by-play metrics and explain what kept either side from
+pulling ahead. Treat the result as a tie: do not name a winner or loser. Ground
+each point in supplied metrics, ignore missing values, and do not invent details.
+Structure: a short headline, then 2-3 concise bullets on what each side did well
+or struggled with, followed by one key takeaway for each team."""
+
 
 def generate_breakdown(
     payload: dict,
@@ -86,8 +94,12 @@ def generate_breakdown(
         client = anthropic.Anthropic()
 
     mode = payload.get("mode", "post")
-    system = SYSTEM_PRE if mode == "pre" else SYSTEM_POST
-    user_message = _format_preview(payload) if mode == "pre" else _format_post(payload)
+    if mode == "pre":
+        system, user_message = SYSTEM_PRE, _format_preview(payload)
+    elif payload.get("tie"):
+        system, user_message = SYSTEM_TIE, _format_tie(payload)
+    else:
+        system, user_message = SYSTEM_POST, _format_post(payload)
     log.info("Requesting %s-game report for %s", mode,
              payload.get("matchup") or payload.get("game_id"))
 
@@ -119,6 +131,22 @@ def _format_post(payload: dict) -> str:
     return (header + "\nMETRICS (JSON):\n"
             + json.dumps(metrics, indent=2, default=str)
             + f"\n\nWrite the film-room breakdown of why {loser} lost.")
+
+
+def _format_tie(payload: dict) -> str:
+    header = (f"GAME: week {payload.get('week')} | tied game | "
+              f"score {json.dumps(payload.get('score', {}))}\n")
+    metrics = {
+        "home_offense": payload.get("home_offense"),
+        "away_offense": payload.get("away_offense"),
+        "home_key_players": payload.get("home_key_players"),
+        "away_key_players": payload.get("away_key_players"),
+        "home_situational": payload.get("home_situational"),
+        "away_situational": payload.get("away_situational"),
+        "charting_metrics_pending": payload.get("charting_metrics_pending"),
+    }
+    return (header + "\nMETRICS (JSON):\n" + json.dumps(metrics, indent=2, default=str)
+            + "\n\nWrite a balanced film-room review of this tied game.")
 
 
 def _format_preview(payload: dict) -> str:

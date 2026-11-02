@@ -19,6 +19,9 @@ jobs:
     name: cap ETL + roster refresh
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Needed so the auto-commit below can push the refreshed DB back to main.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +42,8 @@ jobs:
       - name: Roster refresh
         run: python scripts/refresh_rosters.py --force
 
+      # Keep the artifact as a canary / backup even if the commit-back races or
+      # fails (it uploads before the push so the data is never lost).
       - name: Upload refreshed data
         uses: actions/upload-artifact@v4
         with:
@@ -48,3 +53,21 @@ jobs:
             data/processed/
           retention-days: 14
           if-no-files-found: error
+
+      # 3) Commit the refreshed SQLite snapshot back to main. The live app reads
+      #    the TRACKED data/gridiron.db, and Streamlit Cloud only redeploys on a
+      #    push — so without this the daily refresh produced an artifact nobody
+      #    consumed and the deployed rosters never updated. (This was the manual
+      #    `git add data/gridiron.db` step the old launchd job relied on.)
+      - name: Commit refreshed database
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/gridiron.db
+          if git diff --cached --quiet; then
+            echo "No roster changes to commit — DB unchanged."
+            exit 0
+          fi
+          git commit -m "data: daily roster refresh [skip ci]"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

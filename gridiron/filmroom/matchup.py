@@ -37,6 +37,7 @@ def _strength_edges(home: str, away: str,
 
 def build_preview_payload(home: str, away: str, form_pbp: pd.DataFrame, *,
                           form_season: int, week: int | None = None,
+                          through_week: int | None = None,
                           roster_strength: pd.DataFrame | None = None) -> dict:
     """Assemble the pre-game preview payload (mode='pre').
 
@@ -50,7 +51,7 @@ def build_preview_payload(home: str, away: str, form_pbp: pd.DataFrame, *,
         "form_season": form_season,
         "home": home,
         "away": away,
-        "home_form": pbp_metrics.team_form(form_pbp, home),
-        "away_form": pbp_metrics.team_form(form_pbp, away),
+        "home_form": pbp_metrics.team_form(form_pbp, home, through_week=through_week),
+        "away_form": pbp_metrics.team_form(form_pbp, away, through_week=through_week),
         "roster_edges": _strength_edges(home, away, roster_strength),
     }

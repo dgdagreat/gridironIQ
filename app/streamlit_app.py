@@ -105,6 +105,32 @@ def _team_season(team: str, season: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _team_season_players(team: str, season: int) -> pd.DataFrame:
+    """Per-player cap for a team-season — the atoms the position roll-up sums.
+
+    ``positional_spending`` is literally these rows grouped by position, so the
+    individual-player view and the position view always reconcile. Adds the
+    position *group* + unit and each player's share of the team's committed cap
+    (``cap_pct_norm``, matching the position chart's metric); ``cap_percent`` is
+    already the player's share of the league cap.
+    """
+    from gridiron.ingestion.reference import classify_position
+    df = db.query(
+        "SELECT player, position, cap_number, cap_percent "
+        "FROM player_year_caps WHERE team = :t AND season = :s "
+        "AND cap_number IS NOT NULL ORDER BY cap_number DESC",
+        t=team, s=season,
+    )
+    if df.empty:
+        return df
+    df["pos_group"] = df["position"].map(classify_position)
+    df["unit"] = df["pos_group"].map(_POS_UNIT).fillna("Special teams")
+    total = float(df["cap_number"].sum()) or 1.0
+    df["cap_pct_norm"] = df["cap_number"] / total
+    return df
+
+
+@st.cache_data(show_spinner=False)
 def _seasons_teams() -> tuple[list[int], list[str]]:
     df = db.query("SELECT DISTINCT season, team FROM positional_spending")
     # Native Python ints — not np.int64 — so season comparisons and DB binds work.
@@ -222,6 +248,23 @@ def boardroom_tab() -> None:
                    else seasons[0])
     season = c2.selectbox("Season", seasons, index=seasons.index(_def_season),
                           key="br_season")
+    compare_teams = st.multiselect(
+        "Compare cap efficiency", teams, default=[team], max_selections=6,
+        key="br_compare_teams",
+        help="Select up to six teams to compare normalized position cap shares.")
+    if compare_teams:
+        _comparison = db.query(
+            "SELECT team, pos_group, cap_pct_norm FROM positional_spending "
+            "WHERE season = :s AND team IN (" + ",".join(
+                f":team_{i}" for i in range(len(compare_teams))) + ")",
+            s=season, **{f"team_{i}": t for i, t in enumerate(compare_teams)})
+        if not _comparison.empty:
+            import plotly.express as px
+            fig = px.line(_comparison, x="pos_group", y="cap_pct_norm", color="team",
+                          markers=True, title=f"{season} cap share by position")
+            fig.update_yaxes(tickformat=".0%", title="Share of team cap")
+            fig.update_xaxes(title=None)
+            st.plotly_chart(fig, use_container_width=True)
     if season > config.CURRENT_SEASON:
         st.info(f"⏳ **{season} is a projection** — only cap already tied up in "
                 "signed multi-year contracts. Rosters aren't full this far out, so "
@@ -242,17 +285,63 @@ def boardroom_tab() -> None:
                 _cap_gauge(100 * committed_usd / league_cap, committed_usd,
                            float(league_cap), season),
                 use_container_width=True)
-        left, right = st.columns([3, 2])
-        left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
-        right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
-        st.dataframe(
-            prof[["pos_group", "cap_pct", "cap_pct_norm", "n_players"]],
-            hide_index=True, use_container_width=True, column_config={
-                "pos_group": st.column_config.TextColumn("pos"),
-                "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
-                "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
-                "n_players": st.column_config.NumberColumn("players"),
-            })
+        # Switch the breakdown between the position-group roll-up and the
+        # individual players underneath it — the position bars are just these
+        # players summed, so the two views always reconcile.
+        view = st.radio("Break the cap down by",
+                        ["Position group", "Individual player"],
+                        horizontal=True, key="br_view")
+        if view == "Position group":
+            left, right = st.columns([3, 2])
+            left.plotly_chart(_spending_chart(prof, team, season), use_container_width=True)
+            right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
+            st.dataframe(
+                prof[["pos_group", "cap_pct", "cap_pct_norm", "n_players"]],
+                hide_index=True, use_container_width=True, column_config={
+                    "pos_group": st.column_config.TextColumn("pos"),
+                    "cap_pct": st.column_config.NumberColumn("cap %", format="percent"),
+                    "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+                    "n_players": st.column_config.NumberColumn("players"),
+                })
+        else:
+            players = _team_season_players(team, season)
+            if players.empty:
+                st.info("No per-player cap rows for this team-season.")
+            else:
+                if len(players) <= 12:
+                    n = len(players)
+                    st.caption(f"All {n} players carrying committed cap.")
+                else:
+                    n = st.slider("How many players", 10, min(40, len(players)),
+                                  min(20, len(players)), key="br_player_n")
+                left, right = st.columns([3, 2])
+                left.plotly_chart(_player_spending_chart(players, team, season, n),
+                                  use_container_width=True)
+                right.plotly_chart(_spending_donut(prof, team), use_container_width=True)
+                st.dataframe(
+                    players.head(n)[["player", "position", "cap_number",
+                                     "cap_pct_norm", "cap_percent"]],
+                    hide_index=True, use_container_width=True, column_config={
+                        "player": st.column_config.TextColumn("player"),
+                        "position": st.column_config.TextColumn("pos"),
+                        "cap_number": st.column_config.NumberColumn("cap hit", format="dollar"),
+                        "cap_pct_norm": st.column_config.NumberColumn("of team", format="percent"),
+                        "cap_percent": st.column_config.NumberColumn("of league cap", format="percent"),
+                    })
+
+        # Comparison: the team's cap "shape" laid over the Super Bowl champion
+        # blueprint (radar overlay), plus the position-by-position gap (bar).
+        st.markdown(f"**{team} {season} vs. the Super Bowl champion blueprint**")
+        st.caption("Your normalized cap share at each position vs. what Super Bowl "
+                   "winners have averaged there (2011–2024). The radar overlays the "
+                   "two spending shapes; the bar breaks out the gap — blue = you "
+                   "invest *more* than champions, orange = *less*, zero = on the blueprint.")
+        prem = _champion_premium()
+        bp_left, bp_right = st.columns([1, 1])
+        bp_left.plotly_chart(_blueprint_radar(prof, prem, team, season),
+                             use_container_width=True)
+        bp_right.plotly_chart(_blueprint_fig(prof, prem, team, season),
+                              use_container_width=True)
 
     # On-field efficiency from the PBP lakehouse (nflfastR EPA, built by the Spark
     # medallion and published to the app db). Did the cap allocation translate?
@@ -318,7 +407,8 @@ def film_room_tab() -> None:
                "play-by-play (~40 MB/season) loads on first use.")
 
     c1, c2 = st.columns(2)
-    season = c1.selectbox("Season", [2026, 2025, 2024, 2023], index=0, key="fr_season")
+    fr_seasons = list(range(config.CURRENT_SEASON, config.CURRENT_SEASON - 4, -1))
+    season = c1.selectbox("Season", fr_seasons, index=0, key="fr_season")
     try:
         sched = _schedule(int(season))
     except Exception as exc:  # noqa: BLE001
@@ -345,26 +435,69 @@ def film_room_tab() -> None:
         with st.spinner(f"Loading {season} play-by-play…"):
             pbp = _pbp(int(season))
         payload = pbp_metrics.build_breakdown_payload(pbp, game["game_id"])
-        lo = payload["losing_offense"]
-        st.markdown(f"**{payload['winner']} def. {payload['loser']}** — "
-                    f"why {payload['loser']} lost")
-        m = st.columns(4)
-        m[0].metric(f"{payload['loser']} EPA/play", lo["epa_per_play"])
-        m[1].metric("Pass EPA", lo["pass_epa"])
-        m[2].metric("Sacks allowed", lo["sacks_allowed"])
-        m[3].metric("Turnovers", lo["turnovers"])
+        if payload["tie"]:
+            st.markdown(f"**{game['away_team']} and {game['home_team']} tied**")
+        else:
+            lo = payload["losing_offense"]
+            st.markdown(f"**{payload['winner']} def. {payload['loser']}** — "
+                        f"why {payload['loser']} lost")
+            m = st.columns(4)
+            m[0].metric(f"{payload['loser']} EPA/play", lo["epa_per_play"])
+            m[1].metric("Pass EPA", lo["pass_epa"])
+            m[2].metric("Sacks allowed", lo["sacks_allowed"])
+            m[3].metric("Turnovers", lo["turnovers"])
+        away, home = game["away_team"], game["home_team"]
+        offense_rows = ([payload["away_offense"], payload["home_offense"]]
+                        if payload["tie"] else
+                        [payload["losing_offense"], payload["winning_offense"]])
+        summary = pd.DataFrame(offense_rows).set_index("team").reindex([away, home]).reset_index()
+        summary = summary.rename(columns={
+            "epa_per_play": "EPA/play", "success_rate": "Success rate",
+            "sacks_allowed": "Sacks", "turnovers": "Turnovers",
+            "explosive_play_rate": "Explosive play rate", "plays": "Plays",
+        })
+        st.markdown("##### Game overview")
+        st.dataframe(summary[["team", "Plays", "EPA/play", "Success rate",
+                              "Sacks", "Turnovers", "Explosive play rate"]],
+                     hide_index=True, use_container_width=True)
+        plays = pbp[(pbp["game_id"] == game["game_id"])
+                    & pbp["play_type"].isin(["pass", "run"])].copy()
+        if not plays.empty and {"epa", "posteam"}.issubset(plays.columns):
+            import plotly.express as px
+            if "play_id" in plays:
+                plays = plays.sort_values("play_id")
+            plays["play_number"] = range(1, len(plays) + 1)
+            plays["cumulative_epa"] = plays.groupby("posteam")["epa"].cumsum()
+            fig = px.line(plays, x="play_number", y="cumulative_epa", color="posteam",
+                          title="Cumulative offensive EPA by play",
+                          labels={"play_number": "Play", "cumulative_epa": "Cumulative EPA",
+                                  "posteam": "Offense"})
+            fig.add_hline(y=0, line_color="#888", line_dash="dot")
+            st.plotly_chart(fig, use_container_width=True)
+            with st.expander("Play-by-play detail"):
+                cols = [c for c in ("posteam", "qtr", "quarter_seconds_remaining", "down",
+                                    "ydstogo", "desc", "yards_gained", "epa") if c in plays]
+                st.dataframe(plays[cols], hide_index=True, use_container_width=True)
         with st.expander("Extracted metrics + player attribution"):
             st.json(payload)
-        if st.button("Generate post-game breakdown", type="primary"):
+        if not payload["tie"] and st.button("Generate post-game breakdown", type="primary"):
             _run_report(breakdown, payload)
     else:
-        form_season = int(season) - 1   # offseason: last completed season's form
+        # In an active season, use only games completed before this matchup.
+        # Week 1 and future-season previews have no current-season sample yet.
+        if int(season) == config.CURRENT_SEASON and int(game["week"]) > 1:
+            form_season = int(season)
+            through_week = int(game["week"]) - 1
+        else:
+            form_season = int(season) - 1
+            through_week = None
         with st.spinner(f"Loading {form_season} form…"):
             form_pbp = _pbp(form_season)
         strength = _roster_strength() if db.table_exists("roster_strength") else None
         payload = matchup.build_preview_payload(
             game["home_team"], game["away_team"], form_pbp=form_pbp,
-            form_season=form_season, week=int(game["week"]), roster_strength=strength)
+            form_season=form_season, week=int(game["week"]),
+            through_week=through_week, roster_strength=strength)
         st.markdown(f"**{game['away_team']} @ {game['home_team']}** — "
                     f"matchup preview (form: {form_season})")
         if payload["roster_edges"]:
@@ -437,6 +570,132 @@ def _spending_chart(prof: pd.DataFrame, team: str, season: int):
         yaxis=dict(categoryorder="array", categoryarray=order, title=None),
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
     )
+    return fig
+
+
+def _player_spending_chart(players: pd.DataFrame, team: str, season: int, n: int):
+    """Horizontal, sorted bar of a team's top ``n`` individual cap hits.
+
+    The by-position bar's atoms: each player's slice of the team's committed
+    cap, colored by his unit so the same offense/defense read carries over. Hover
+    carries the dollar hit and the share of the league cap alongside it.
+    """
+    import plotly.graph_objects as go
+    d = players.nlargest(n, "cap_number").sort_values("cap_number")  # top lands up
+    order = d["player"].tolist()
+
+    fig = go.Figure()
+    for unit, color in _UNIT_COLOR.items():
+        sub = d[d["unit"] == unit]
+        if sub.empty:
+            continue
+        fig.add_bar(
+            x=sub["cap_pct_norm"], y=sub["player"], name=unit, orientation="h",
+            marker_color=color, cliponaxis=False,
+            text=[f"{v:.0%}" for v in sub["cap_pct_norm"]], textposition="outside",
+            textfont=dict(color="#222", size=10),
+            customdata=sub[["position", "cap_number", "cap_percent"]].to_numpy(),
+            hovertemplate=("<b>%{y}</b> · %{customdata[0]}"
+                           "<br>%{x:.1%} of the team's cap"
+                           "<br>$%{customdata[1]:,.0f} · %{customdata[2]:.1%} of the league cap"
+                           "<extra></extra>"),
+        )
+    xmax = float(d["cap_pct_norm"].max() or 0) * 1.2 or 1.0
+    fig.update_layout(
+        barmode="stack", height=max(360, 24 * len(d)), bargap=0.3,
+        margin=dict(t=44, b=46, l=10, r=28),
+        title=dict(text=f"{team} {season} — cap share by player (top {len(d)})",
+                   x=0, xanchor="left", y=0.99, font=dict(size=14)),
+        legend=dict(orientation="h", yanchor="top", y=-0.06, x=0,
+                    font=dict(size=11), title=None),
+        xaxis=dict(tickformat=".0%", range=[0, xmax], showgrid=True,
+                   gridcolor="rgba(0,0,0,0.06)", zeroline=False, title=None),
+        yaxis=dict(categoryorder="array", categoryarray=order, title=None),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+
+def _blueprint_fig(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: int):
+    """Diverging bar: the team's normalized cap share at each position minus the
+    Super Bowl champion average there — how far above/below the title blueprint
+    this roster sits, position by position. Blue = over-invested vs champions,
+    orange = under-invested; the zero line is the blueprint."""
+    import plotly.graph_objects as go
+    champ = prem.set_index("pos_group")["champion_avg"]
+    d = prof.copy()
+    d["champ"] = d["pos_group"].map(champ)
+    d = d.dropna(subset=["champ"])
+    d["delta_pts"] = (d["cap_pct_norm"] - d["champ"]) * 100   # percentage points
+    d["position"] = d["pos_group"].map(_POS_FULL).fillna(d["pos_group"])
+    d = d.sort_values("delta_pts")
+    over = d["delta_pts"] >= 0
+    fig = go.Figure(go.Bar(
+        x=d["delta_pts"], y=d["position"], orientation="h",
+        marker_color=["#2b6cb0" if o else "#d4691e" for o in over],
+        text=[f"{v:+.1f}" for v in d["delta_pts"]], textposition="outside",
+        cliponaxis=False,
+        customdata=d[["cap_pct_norm", "champ"]].to_numpy(),
+        hovertemplate=("<b>%{y}</b><br>You %{customdata[0]:.1%} · "
+                       "champions %{customdata[1]:.1%}"
+                       "<br>%{x:+.1f} pts vs blueprint<extra></extra>"),
+    ))
+    fig.update_layout(
+        title=dict(text=f"{team} {season} cap share − champion average",
+                   font=dict(size=14), x=0, xanchor="left"),
+        xaxis_title="Percentage points above / below the champion blueprint",
+        yaxis_title=None, height=420, showlegend=False,
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(size=13), margin=dict(l=10, r=48, t=52, b=42))
+    fig.update_xaxes(ticksuffix=" pts", gridcolor="#eef1f3", zeroline=True,
+                     zerolinecolor="#c9ced4", zerolinewidth=1)
+    fig.update_yaxes(ticksuffix="  ")
+    return fig
+
+
+def _blueprint_radar(prof: pd.DataFrame, prem: pd.DataFrame, team: str, season: int):
+    """Radar overlay: the team's normalized cap share at each position laid over
+    the Super Bowl champion average, so the roster's spending *shape* reads against
+    the title blueprint at a glance. The team polygon (green) bulging past the
+    champion outline (grey, dotted) = over-invested there; caving inside it =
+    under-invested. The diverging bar beside it carries the exact gaps."""
+    import plotly.graph_objects as go
+    from gridiron.ingestion.reference import POSITION_GROUP_ORDER
+    champ = prem.set_index("pos_group")["champion_avg"]
+    team_share = prof.set_index("pos_group")["cap_pct_norm"]
+    # Fixed spoke order (offense arc, then defense, then specialists) so the
+    # shape is comparable across teams and seasons; close the loop for the fill.
+    order = [p for p in POSITION_GROUP_ORDER if p in champ.index or p in team_share.index]
+    cats = [_POS_FULL.get(p, p) for p in order]
+    champ_v = [float(champ.get(p, 0.0)) * 100 for p in order]
+    team_v = [float(team_share.get(p, 0.0)) * 100 for p in order]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=champ_v + champ_v[:1], theta=cats + cats[:1], name="SB champion avg",
+        mode="lines", line=dict(color="#6b7280", width=2, dash="dot"),
+        fill="toself", fillcolor="rgba(107,114,128,0.10)",
+        hovertemplate="%{theta}<br>Champions %{r:.1f}% of cap<extra></extra>"))
+    fig.add_trace(go.Scatterpolar(
+        r=team_v + team_v[:1], theta=cats + cats[:1], name=f"{team} {season}",
+        mode="lines", line=dict(color="#1a9850", width=2.5),
+        fill="toself", fillcolor="rgba(26,152,80,0.22)",
+        hovertemplate=team + " %{theta}<br>%{r:.1f}% of cap<extra></extra>"))
+    rmax = (max(champ_v + team_v) or 1.0) * 1.12
+    fig.update_layout(
+        height=440, margin=dict(t=56, b=58, l=58, r=58),
+        title=dict(text=f"{team} {season} cap shape vs. the blueprint",
+                   x=0, xanchor="left", font=dict(size=14)),
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(range=[0, rmax], ticksuffix="%", angle=90,
+                            tickangle=90, tickfont=dict(size=9),
+                            gridcolor="#e5e7eb", linecolor="#e5e7eb"),
+            angularaxis=dict(rotation=90, direction="clockwise",
+                             tickfont=dict(size=11), gridcolor="#e5e7eb")),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.10, x=0.5,
+                    xanchor="center", font=dict(size=11)),
+        paper_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
@@ -774,7 +1033,7 @@ def maxer_tab() -> None:
     c1.metric("SB outlook", f"{rep['readiness']:.1f}/100")
     rec = rep.get("season_record")
     c2.metric(f"{meta['roster_season']} record",
-              f"{rec['wins']}–{rec['losses']}" if rec else "—",
+              f"{rec['wins']}–{rec['losses']}–{rec['ties']}" if rec else "—",
               help="This season's results so far — blended into the outlook with a "
                    "weight that grows as more games are played.")
     c3.metric("Roster", f"{rep['roster_readiness']:.0f}")
@@ -845,7 +1104,8 @@ def maxer_tab() -> None:
     st.divider()
     st.subheader(f"Free agents to fill {team}'s needs")
     if db.table_exists("free_agents"):
-        recs = free_agents.recommend_for_team(team, strength, _free_agents())
+        fa_pool = _free_agents()
+        recs = free_agents.recommend_for_team(team, strength, fa_pool)
         if recs.empty:
             st.caption("No clear free-agent upgrades at the top needs right now.")
         else:
@@ -856,6 +1116,38 @@ def maxer_tab() -> None:
                 "madden_ovr": st.column_config.NumberColumn(format="%.0f"),
                 "age": st.column_config.NumberColumn(format="%.1f"),
                 "est_apy_$m": st.column_config.NumberColumn("est. $/yr (M)", format="$%.1f")})
+        # The simulator runs off the whole FA pool, so show it whenever the pool
+        # has players — independent of whether there were top-need recommendations.
+        candidate_names = sorted(fa_pool["player"].dropna().unique())
+        if candidate_names:
+            st.markdown("##### Simulate a signing")
+            candidate_name = st.selectbox("Free agent", candidate_names,
+                                          key=f"mx_sim_player_{team}")
+            candidate = fa_pool[fa_pool["player"] == candidate_name].iloc[0]
+            sim_pos = candidate.get("pos_group", "—")
+            sim_apy = candidate.get("est_apy")
+            sim_apy = float(sim_apy) if pd.notna(sim_apy) else 1.0
+            sim_cost = st.number_input("Estimated year-one cap charge ($M)",
+                                       min_value=0.0, value=sim_apy, step=0.5,
+                                       key=f"mx_sim_cost_{team}")
+            cap = config.LEAGUE_SALARY_CAP.get(config.CURRENT_SEASON)
+            spend = db.query(
+                "SELECT COALESCE(SUM(cap_dollars), 0) AS committed "
+                "FROM positional_spending WHERE team=:t AND season=:s",
+                t=team, s=config.CURRENT_SEASON)
+            committed = float(spend.iloc[0]["committed"])
+            if cap:
+                space = cap - committed
+                st.metric("Projected cap remaining",
+                          f"${(space - sim_cost * 1_000_000):,.0f}",
+                          delta=f"−${sim_cost:,.1f}M signing cost")
+                if sim_cost * 1_000_000 > space:
+                    st.warning("This estimate exceeds the team's unadjusted cap space.")
+            st.caption(f"{candidate_name} · {sim_pos} · talent grade "
+                       f"{float(candidate['talent']):.0%} · estimated APY ${sim_apy:.1f}M. "
+                       "The default cost is the player's prior APY, used as a rough proxy "
+                       "for year-one cap charge. Cap space ignores restructures, roster "
+                       "displacement, incentives, and dead money.")
     else:
         st.caption("Run `python scripts/refresh_rosters.py` to build the FA pool.")
 
@@ -863,9 +1155,10 @@ def maxer_tab() -> None:
     st.subheader("League-wide SB outlook")
     lt = league[["rank", "team", "outlook", "roster_readiness", "org_score"]].copy()
     lt.insert(2, "grade", lt["outlook"].map(_grade))
-    if {"wins", "losses", "games"}.issubset(league.columns) and int(league["games"].sum()) > 0:
+    if {"wins", "losses", "ties", "games"}.issubset(league.columns) and int(league["games"].sum()) > 0:
         lt.insert(2, "rec", (league["wins"].astype(int).astype(str) + "–"
-                             + league["losses"].astype(int).astype(str)))
+                             + league["losses"].astype(int).astype(str) + "–"
+                             + league["ties"].astype(int).astype(str)))
     st.dataframe(_style_grades(lt, ["grade"]), hide_index=True, height=320,
                  column_config={
                      "rec": st.column_config.TextColumn(f"{config.CURRENT_SEASON}"),

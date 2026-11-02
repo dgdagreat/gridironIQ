@@ -57,7 +57,7 @@ def prior_season_rank(season: int) -> pd.DataFrame:
     year" baseline the predicted outlook rank moves from.
 
     Ranks the teams by that season's regular-season record (win%, then point
-    differential as tiebreak); rank 1 = best. Returns team, wins, losses,
+    differential as tiebreak); rank 1 = best. Returns team, wins, losses, ties,
     win_pct, point_diff, prev_rank — empty if ``season`` has no completed games.
     """
     from gridiron.ingestion import schedules
@@ -65,18 +65,18 @@ def prior_season_rank(season: int) -> pd.DataFrame:
 
     sched = schedules.load_schedules()
     if "home_score" not in sched:
-        return pd.DataFrame(columns=["team", "wins", "losses", "win_pct",
+        return pd.DataFrame(columns=["team", "wins", "losses", "ties", "win_pct",
                                      "point_diff", "prev_rank"])
     gtype = sched["game_type"] if "game_type" in sched else "REG"
     g = sched[(sched["season"] == season) & sched["home_score"].notna()
               & (gtype == "REG")].copy()
     if g.empty:
-        return pd.DataFrame(columns=["team", "wins", "losses", "win_pct",
+        return pd.DataFrame(columns=["team", "wins", "losses", "ties", "win_pct",
                                      "point_diff", "prev_rank"])
     g["home"] = g["home_team"].map(canonical_team)
     g["away"] = g["away_team"].map(canonical_team)
 
-    rec = {t: {"w": 0, "l": 0, "pf": 0, "pa": 0} for t in CANONICAL_TEAMS}
+    rec = {t: {"w": 0, "l": 0, "t": 0, "pf": 0, "pa": 0} for t in CANONICAL_TEAMS}
     for r in g.itertuples(index=False):
         for team, pts, opp in ((r.home, r.home_score, r.away_score),
                                (r.away, r.away_score, r.home_score)):
@@ -84,13 +84,15 @@ def prior_season_rank(season: int) -> pd.DataFrame:
                 continue
             d = rec[team]
             d["pf"] += pts; d["pa"] += opp
-            d["w"] += int(pts > opp); d["l"] += int(pts < opp)   # ties: neither
+            d["w"] += int(pts > opp); d["l"] += int(pts < opp)
+            d["t"] += int(pts == opp)
 
-    rows = [{"team": t, "wins": d["w"], "losses": d["l"],
-             "win_pct": d["w"] / (d["w"] + d["l"]) if (d["w"] + d["l"]) else 0.0,
+    rows = [{"team": t, "wins": d["w"], "losses": d["l"], "ties": d["t"],
+             "win_pct": (d["w"] + 0.5 * d["t"]) / (d["w"] + d["l"] + d["t"])
+             if (d["w"] + d["l"] + d["t"]) else 0.0,
              "point_diff": d["pf"] - d["pa"]} for t, d in rec.items()]
     df = pd.DataFrame(rows)
-    df = df[(df["wins"] + df["losses"]) > 0]                      # teams that played
+    df = df[(df["wins"] + df["losses"] + df["ties"]) > 0]         # teams that played
     df = df.sort_values(["win_pct", "point_diff"], ascending=False, ignore_index=True)
     df["prev_rank"] = df.index + 1
     return df
@@ -101,7 +103,7 @@ def current_form(season: int | None = None) -> pd.DataFrame:
 
     A 0–100 ``form_score`` from win percentage, plus ``games`` played (how much to
     trust it yet). Returns an empty frame before the season has any completed games.
-    Columns: team, wins, losses, win_pct, point_diff, games, form_score.
+    Columns: team, wins, losses, ties, win_pct, point_diff, games, form_score.
     """
     from gridiron import config
 
@@ -109,9 +111,9 @@ def current_form(season: int | None = None) -> pd.DataFrame:
     cur = prior_season_rank(season)
     if cur.empty:
         return cur
-    cur = cur.assign(games=(cur["wins"] + cur["losses"]).astype(int),
+    cur = cur.assign(games=(cur["wins"] + cur["losses"] + cur["ties"]).astype(int),
                      form_score=(100.0 * cur["win_pct"]).round(1))
-    return cur[["team", "wins", "losses", "win_pct", "point_diff",
+    return cur[["team", "wins", "losses", "ties", "win_pct", "point_diff",
                 "games", "form_score"]]
 
 
@@ -122,7 +124,7 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     (45%); once the season starts, this year's results are mixed in with a weight
     that grows with games played (so the rank fluctuates week to week while roster
     quality still anchors it early). Columns: team, roster_readiness, org_score,
-    form_score, wins, losses, games, outlook, rank.
+    form_score, wins, losses, ties, games, outlook, rank.
     """
     weights = position_weights()
     blueprint = champion_blueprint(weights)
@@ -146,16 +148,16 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     # still anchors the outlook early while the rank moves as games are played.
     form = current_form()
     if not form.empty:
-        table = table.merge(form[["team", "wins", "losses", "games", "form_score"]],
+        table = table.merge(form[["team", "wins", "losses", "ties", "games", "form_score"]],
                             on="team", how="left")
-        for col, dflt in (("wins", 0), ("losses", 0), ("games", 0)):
+        for col, dflt in (("wins", 0), ("losses", 0), ("ties", 0), ("games", 0)):
             table[col] = table[col].fillna(dflt).astype(int)
         table["form_score"] = table["form_score"].fillna(table["base_outlook"])
         w = (table["games"] / FORM_RAMP_GAMES).clip(upper=1.0) * FORM_WEIGHT_MAX
         table["outlook"] = ((1 - w) * table["base_outlook"]
                             + w * table["form_score"]).round(1)
     else:
-        for col in ("wins", "losses", "games"):
+        for col in ("wins", "losses", "ties", "games"):
             table[col] = 0
         table["form_score"] = float("nan")
         table["outlook"] = table["base_outlook"]
@@ -192,7 +194,8 @@ def team_report(team: str, strength: pd.DataFrame) -> dict:
     record = None
     if games > 0:
         record = {"wins": int(row["wins"]), "losses": int(row["losses"]),
-                  "win_pct": round(int(row["wins"]) / games, 3)}
+                  "ties": int(row["ties"]), "win_pct": round(
+                      (int(row["wins"]) + 0.5 * int(row["ties"])) / games, 3)}
     return {
         "team": team,
         "readiness": float(row["outlook"]),          # headline = blended outlook

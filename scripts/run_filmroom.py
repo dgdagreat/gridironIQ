@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gridiron import db  # noqa: E402
+from gridiron import config, db  # noqa: E402
 from gridiron.filmroom import breakdown, matchup, pbp_metrics  # noqa: E402
 from gridiron.ingestion import schedules  # noqa: E402
 
@@ -35,12 +35,17 @@ def build_payload(game_id: str) -> dict:
     if game["status"] == "played":
         pbp = pbp_metrics.load_pbp(season)
         return pbp_metrics.build_breakdown_payload(pbp, game_id)
-    form_season = season - 1   # offseason: last completed season's form
+    week = int(game["week"])
+    if season == config.CURRENT_SEASON and week > 1:
+        form_season, through_week = season, week - 1
+    else:
+        form_season, through_week = season - 1, None
     form_pbp = pbp_metrics.load_pbp(form_season)
     strength = db.read_table("roster_strength") if db.table_exists("roster_strength") else None
     return matchup.build_preview_payload(
         game["home_team"], game["away_team"], form_pbp=form_pbp,
-        form_season=form_season, week=int(game["week"]), roster_strength=strength)
+        form_season=form_season, week=week, through_week=through_week,
+        roster_strength=strength)
 
 
 def _run_week(season: int, week: int, out: str | None) -> int:

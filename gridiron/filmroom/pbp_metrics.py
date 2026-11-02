@@ -51,10 +51,13 @@ def list_games(pbp: pd.DataFrame) -> pd.DataFrame:
     cols = ["game_id", "week", "home_team", "away_team",
             "home_score", "away_score"]
     games = pbp[cols].drop_duplicates("game_id").reset_index(drop=True)
+    games["tie"] = games["home_score"].eq(games["away_score"])
     games["winner"] = games.apply(
-        lambda r: r.home_team if r.home_score > r.away_score else r.away_team, axis=1)
+        lambda r: (r.home_team if r.home_score > r.away_score else
+                   r.away_team if r.away_score > r.home_score else None), axis=1)
     games["loser"] = games.apply(
-        lambda r: r.away_team if r.home_score > r.away_score else r.home_team, axis=1)
+        lambda r: (r.away_team if r.home_score > r.away_score else
+                   r.home_team if r.away_score > r.home_score else None), axis=1)
     return games
 
 
@@ -69,7 +72,16 @@ def team_offense_metrics(pbp: pd.DataFrame, game_id: str, team: str) -> dict:
         return round(float(numer) / float(denom), 3) if denom else None
 
     rz = g[g["yardline_100"] <= 20]
-    rz_td = rz["touchdown"].sum() if "touchdown" in rz else 0
+    # Offensive red-zone TDs only. A pick-six/fumble-return TD shares the
+    # offense's play row (posteam == team) with touchdown==1, so summing the
+    # generic flag would credit the offense for the defense's score.
+    if {"pass_touchdown", "rush_touchdown"} <= set(rz.columns):
+        rz_td = int(rz["pass_touchdown"].fillna(0).sum()
+                    + rz["rush_touchdown"].fillna(0).sum())
+    elif {"touchdown", "td_team"} <= set(rz.columns):
+        rz_td = int(((rz["touchdown"] == 1) & (rz["td_team"] == team)).sum())
+    else:
+        rz_td = int(rz["touchdown"].sum()) if "touchdown" in rz else 0
     pass_plays = plays[plays["play_type"].eq("pass")]
     explosive = plays[((plays["play_type"].eq("pass")) & (plays["yards_gained"] >= 20)) |
                       ((plays["play_type"].eq("run")) & (plays["yards_gained"] >= 10))]
@@ -80,11 +92,15 @@ def team_offense_metrics(pbp: pd.DataFrame, game_id: str, team: str) -> dict:
         "epa_per_play": round(float(plays["epa"].mean()), 3) if len(plays) else None,
         "success_rate": round(float(plays["success"].mean()), 3) if "success" in plays and len(plays) else None,
         "pass_epa": round(float(pass_plays["epa"].mean()), 3) if len(pass_plays) else None,
-        "rush_epa": round(float(plays[plays.play_type.eq("run")]["epa"].mean()), 3) if len(plays) else None,
+        "rush_epa": round(float(plays[plays.play_type.eq("run")]["epa"].mean()), 3)
+        if plays["play_type"].eq("run").any() else None,
         "explosive_play_rate": rate(len(explosive), len(plays)),
         "third_down_conv_rate": _third_down_rate(g),
         "red_zone_td_rate": rate(rz_td, max(g["drive"].nunique() and len(rz.drop_duplicates("drive")), 0)) if "drive" in g else None,
-        "pressure_rate_allowed": rate(g["qb_hit"].sum() + g["sack"].sum(), len(dropbacks)) if {"qb_hit", "sack"} <= set(g.columns) else None,
+        "pressure_rate_allowed": rate(
+            int((g["qb_hit"].fillna(0).astype(bool)
+                 | g["sack"].fillna(0).astype(bool)).sum()), len(dropbacks))
+        if {"qb_hit", "sack"} <= set(g.columns) else None,
         "sacks_allowed": int(g["sack"].sum()) if "sack" in g else None,
         "turnovers": int(g["interception"].sum() + g.get("fumble_lost", pd.Series(dtype=float)).sum()),
         "yac_per_completion": round(float(pass_plays.loc[pass_plays.complete_pass.eq(1), "yards_after_catch"].mean()), 2)
@@ -133,7 +149,11 @@ def team_form(pbp: pd.DataFrame, team: str, through_week: int | None = None) -> 
         db = frame[frame["play_type"] == "pass"]
         if not len(db) or not {"qb_hit", "sack"} <= set(frame.columns):
             return None
-        return round(float((db["qb_hit"].sum() + db["sack"].sum()) / len(db)), 3)
+        # A dropback is pressured if hit OR sacked — a sack is often also flagged
+        # qb_hit, so OR them (don't sum) to avoid double-counting that play.
+        pressured = (db["qb_hit"].fillna(0).astype(bool)
+                     | db["sack"].fillna(0).astype(bool)).sum()
+        return round(float(pressured) / len(db), 3)
 
     giveaways = float(off["interception"].sum()) + (
         float(off["fumble_lost"].sum()) if "fumble_lost" in off else 0.0)
@@ -215,19 +235,37 @@ def build_breakdown_payload(pbp: pd.DataFrame, game_id: str) -> dict:
     if game_id not in games.index:
         raise KeyError(f"game_id {game_id!r} not found in play-by-play")
     row = games.loc[game_id]
+    tied = bool(row["tie"])
+    home, away = row["home_team"], row["away_team"]
+    home_offense = team_offense_metrics(pbp, game_id, home)
+    away_offense = team_offense_metrics(pbp, game_id, away)
 
-    return {
+    payload = {
         "mode": "post",
         "game_id": game_id,
         "week": int(row["week"]),
         "winner": row["winner"],
         "loser": row["loser"],
+        "tie": tied,
         "score": {row["home_team"]: int(row["home_score"]),
                   row["away_team"]: int(row["away_score"])},
-        "losing_offense": team_offense_metrics(pbp, game_id, row["loser"]),
-        "winning_offense": team_offense_metrics(pbp, game_id, row["winner"]),
-        "losing_key_players": key_players(pbp, game_id, row["loser"]),
-        "winning_key_players": key_players(pbp, game_id, row["winner"]),
-        "losing_situational": _situational(pbp, game_id, row["loser"]),
+        "home_offense": home_offense,
+        "away_offense": away_offense,
         "charting_metrics_pending": list(CHARTING_METRICS),
     }
+    if tied:
+        payload.update({
+            "home_key_players": key_players(pbp, game_id, home),
+            "away_key_players": key_players(pbp, game_id, away),
+            "home_situational": _situational(pbp, game_id, home),
+            "away_situational": _situational(pbp, game_id, away),
+        })
+    else:
+        payload.update({
+            "losing_offense": away_offense if row["loser"] == away else home_offense,
+            "winning_offense": away_offense if row["winner"] == away else home_offense,
+            "losing_key_players": key_players(pbp, game_id, row["loser"]),
+            "winning_key_players": key_players(pbp, game_id, row["winner"]),
+            "losing_situational": _situational(pbp, game_id, row["loser"]),
+        })
+    return payload
