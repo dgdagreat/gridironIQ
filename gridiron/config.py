@@ -57,9 +57,16 @@ START_SEASON: int = 1994
 #: Last season with a finalized Super Bowl outcome -- the ceiling for any
 #: analysis that correlates spending with *winning* (champion premium, ML).
 END_SEASON: int = 2024
-#: The current NFL league year (rolls over to the new year every March).
+#: The current NFL league year (rolls over to the new year every March). Used by
+#: the data pipeline / projection math, which keys off the league-year calendar.
 _TODAY = _dt.date.today()
 CURRENT_SEASON: int = _TODAY.year if _TODAY.month >= 3 else _TODAY.year - 1
+#: The season the UI should default to. It rolls over to the new season every
+#: **August** (training camp / preseason), so the app points at the season about
+#: to be played once the offseason ends — not the prior one — and advances on its
+#: own each year with no code change. Before August it stays on the most recent
+#: season that actually has games.
+DEFAULT_SEASON: int = _TODAY.year if _TODAY.month >= 8 else _TODAY.year - 1
 #: Contracts commit cap dollars years in advance, so positional *spending* can
 #: be projected forward even though outcomes can't. We carry committed-cap
 #: shares up to five league years past the current one.
