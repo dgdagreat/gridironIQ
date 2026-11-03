@@ -148,7 +148,7 @@ export function Maxer({ meta }) {
                       <table className="dtable">
                         <thead><tr><th>Pos</th><th className="num">Strength</th><th className="num">Blueprint</th><th className="num">Gap</th></tr></thead>
                         <tbody>
-                          {r.needs.map((n) => (
+                          {r.needs.filter((n) => n.blueprint != null).map((n) => (
                             <tr key={n.pos_group}>
                               <td>{n.pos_group}</td>
                               <td className="num">{num(n.strength, 0)}</td>
