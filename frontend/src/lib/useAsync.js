@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 
 // Run an async loader whenever `deps` change; expose {data, loading, error}.
-// `fn` is called with an AbortSignal-free closure — guard against setting state
-// after unmount via the `active` flag.
+// The `active` flag guards against setting state after unmount / a stale run.
 export function useAsync(fn, deps) {
   const [state, setState] = useState({ data: null, loading: true, error: null })
   useEffect(() => {

@@ -312,13 +312,33 @@ def maxer_simulate(team: str, body: MaxerSimulationRequest) -> dict:
     }
 
 
+_VALUE_BOARD_CACHE: tuple[float, pd.DataFrame] | None = None
+
+
+def _value_board() -> pd.DataFrame:
+    """Build the value board once per DB snapshot, keyed on the DB file's mtime.
+
+    ``build_value_board`` scans all player value data (a few seconds); the
+    position filter is applied afterward, so the board is reused across requests
+    until the daily DB refresh changes the file's mtime.
+    """
+    global _VALUE_BOARD_CACHE
+    try:
+        mtime = config.DB_PATH.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if _VALUE_BOARD_CACHE is None or _VALUE_BOARD_CACHE[0] != mtime:
+        _VALUE_BOARD_CACHE = (mtime, value_board.build_value_board(_player_talent()))
+    return _VALUE_BOARD_CACHE[1]
+
+
 @app.get("/api/value-board")
 def value_board_data(position: str = "All", limit: int = 25) -> dict:
     """Best contract values and biggest overpays, optionally by position."""
     if not 1 <= limit <= 100:
         raise HTTPException(400, "limit must be between 1 and 100")
     try:
-        board = value_board.build_value_board(_player_talent())
+        board = _value_board()
     except (FileNotFoundError, KeyError) as exc:
         raise HTTPException(404, "Player value data is unavailable") from exc
     positions = ["All", *sorted(board["pos_group"].dropna().unique().tolist())]
