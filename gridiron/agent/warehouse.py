@@ -104,13 +104,12 @@ def run_sql(sql: str, warehouse: Path = WAREHOUSE_PATH) -> QueryResult:
         # The agent only needs the already-landed DuckDB database. Keep its
         # connection read-only and disable DuckDB's separate filesystem access
         # surface (read_csv/read_parquet, COPY, ATTACH, remote filesystems), and
-        # cap query resources before locking configuration against user SQL.
+        # cap memory/threads before locking configuration against user SQL.
         con = duckdb.connect(
             str(warehouse), read_only=True,
             config={"enable_external_access": "false",
                     "autoinstall_known_extensions": "false",
                     "autoload_known_extensions": "false",
-                    "max_execution_time": "30000",
                     "memory_limit": "512MB",
                     "threads": "2"},
         )
