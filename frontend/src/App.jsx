@@ -2,51 +2,54 @@ import { useState } from 'react'
 import { api } from './api/client.js'
 import { useAsync } from './lib/useAsync.js'
 import { Async } from './components/Async.jsx'
-import { Boardroom } from './tabs/Boardroom.jsx'
-import { FilmRoom } from './tabs/FilmRoom.jsx'
-import { Maxer } from './tabs/Maxer.jsx'
-import { ValueBoard } from './tabs/ValueBoard.jsx'
+import { Boardroom } from './sections/Boardroom.jsx'
+import { FilmRoom } from './sections/FilmRoom.jsx'
+import { Maxer } from './sections/Maxer.jsx'
+import { ValueBoard } from './sections/ValueBoard.jsx'
 
-const TABS = [
+const SECTIONS = [
   { id: 'boardroom', label: 'Boardroom' },
   { id: 'filmroom', label: 'Film Room' },
-  { id: 'maxer', label: 'Super Bowl Maxer' },
-  { id: 'valueboard', label: 'Value Board' },
+  { id: 'maxer', label: 'SB Maxer' },
+  { id: 'value', label: 'Value Board' },
 ]
 
+const VIEWS = {
+  boardroom: (m) => <Boardroom meta={m} />,
+  filmroom: (m) => <FilmRoom meta={m} />,
+  maxer: (m) => <Maxer meta={m} />,
+  value: () => <ValueBoard />,
+}
+
 export default function App() {
-  const [tab, setTab] = useState('boardroom')
+  const [section, setSection] = useState('boardroom')
   const meta = useAsync(() => api.meta(), [])
 
   return (
     <>
-      <header className="app-header">
+      <header className="masthead">
         <div className="inner">
-          <h1>🏈 GridironIQ</h1>
-          <p>Cap efficiency &amp; film breakdowns — the React frontend over the gridiron analytics.</p>
-          <nav className="tabbar">
-            {TABS.map((t) => (
+          <div className="wordmark">
+            <span className="dot" />
+            Gridiron<em>IQ</em>
+          </div>
+          <nav className="nav">
+            {SECTIONS.map((s) => (
               <button
-                key={t.id}
-                className={tab === t.id ? 'active' : ''}
-                onClick={() => setTab(t.id)}
+                key={s.id}
+                className={section === s.id ? 'active' : ''}
+                onClick={() => setSection(s.id)}
               >
-                {t.label}
+                {s.label}
               </button>
             ))}
           </nav>
         </div>
       </header>
 
-      <main>
-        <Async state={meta}>
-          {(m) => (
-            tab === 'boardroom' ? <Boardroom meta={m} />
-              : tab === 'filmroom' ? <FilmRoom meta={m} />
-                : tab === 'maxer' ? <Maxer meta={m} /> : <ValueBoard />
-          )}
-        </Async>
-      </main>
+      <Async state={meta}>
+        {(m) => (VIEWS[section] ?? VIEWS.boardroom)(m)}
+      </Async>
     </>
   )
 }
