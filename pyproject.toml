@@ -22,6 +22,9 @@ dependencies = [
     # --- app ---
     "streamlit>=1.35",       # needs plotly_chart on_select (click events)
     "plotly>=5.20",          # interactive football-field view
+    # --- JSON API layer (React frontend / Cloud Run service) ---
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
 ]
 
 [project.optional-dependencies]
