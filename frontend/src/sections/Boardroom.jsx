@@ -9,6 +9,7 @@ import { Archetypes } from '../components/Archetypes.jsx'
 export function Boardroom({ meta }) {
   const premium = useAsync(() => api.championPremium(), [])
   const verdict = useAsync(() => api.efficiencyVerdict(), [])
+  const minSeason = Math.min(...meta.seasons)
 
   return (
     <div className="wrap">
@@ -20,6 +21,11 @@ export function Boardroom({ meta }) {
           tilt the cap toward a handful of positions and find value in the rest. Here's where
           the money actually moves.
         </p>
+        <div className="meta">
+          <span>Salary-cap era</span>
+          <span>{minSeason}–{meta.current_season}</span>
+          <span>{meta.teams.length} teams</span>
+        </div>
       </div>
 
       <div className="block card">

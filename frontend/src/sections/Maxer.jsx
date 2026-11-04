@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from '../components/Async.jsx'
 import { Field } from '../components/Field.jsx'
+import { PosTag } from '../components/PosTag.jsx'
 import { num } from '../lib/format.js'
 
 const gradeColor = (score) => {
@@ -13,24 +14,32 @@ const gradeColor = (score) => {
 
 function FootballField({ starters, mode }) {
   const lines = [35, 40, 45, 50, 55, 60, 65]
+  const wrapRef = useRef(null)
+  const [hover, setHover] = useState(null)
+
+  const track = (slot, i) => (e) => {
+    if (!slot.player) return
+    const r = wrapRef.current?.getBoundingClientRect()
+    if (r) setHover({ i, slot, x: e.clientX - r.left, y: e.clientY - r.top })
+  }
+
   return (
-    <div className="field-wrap">
+    <div className="field-wrap" ref={wrapRef}>
       <svg className="football-field" viewBox="0 0 533 350" role="img"
-        aria-label="Projected 11-personnel offense versus nickel defense">
-        <rect x="0" y="0" width="533" height="350" rx="10" fill="#1f5a39" />
+        aria-label="Projected 11-personnel offense versus nickel defense"
+        onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id="turf" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#1b4733" />
+            <stop offset="1" stopColor="#123020" />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="533" height="350" rx="6" fill="url(#turf)" />
         {lines.map((yard) => (
-          <g key={yard}>
-            <line x1="0" x2="533" y1={(66 - yard) * 10} y2={(66 - yard) * 10}
-              stroke="rgba(255,255,255,.28)" strokeWidth={yard % 10 === 0 ? 2 : 1} />
-            {yard % 10 === 0 && (
-              <>
-                <text x="8" y={(66 - yard) * 10 - 3} className="yard-mark">{yard}</text>
-                <text x="509" y={(66 - yard) * 10 - 3} className="yard-mark">{yard}</text>
-              </>
-            )}
-          </g>
+          <line key={yard} x1="0" x2="533" y1={(66 - yard) * 10} y2={(66 - yard) * 10}
+            stroke="rgba(255,255,255,.1)" strokeWidth={yard % 10 === 0 ? 1.5 : 1} />
         ))}
-        <line x1="0" x2="533" y1={(66 - 44) * 10} y2={(66 - 44) * 10} stroke="rgba(255,255,255,.85)" strokeWidth="2" />
+        <line x1="0" x2="533" y1={(66 - 44) * 10} y2={(66 - 44) * 10} stroke="rgba(255,255,255,.45)" strokeWidth="1.5" />
         <text x="266" y="31" textAnchor="middle" className="field-label">▲ DEFENSE · NICKEL</text>
         <text x="266" y="341" textAnchor="middle" className="field-label">▼ OFFENSE · 11 PERSONNEL</text>
         {starters.map((slot, i) => {
@@ -39,25 +48,46 @@ function FootballField({ starters, mode }) {
           const cy = (66 - slot.y) * 10
           const color = slot.player ? gradeColor(grade ?? slot.strength) : '#5b6472'
           const name = slot.player
+          const last = name ? (name.split(' ').slice(-1)[0] || name) : ''
+          const short = last.length > 9 ? `${last.slice(0, 8)}…` : last
+          const plateW = Math.min(48, short.length * 3.7 + 9)
+          const active = hover && hover.i === i
+          const dim = hover && hover.i !== i
           return (
-            <g key={`${slot.label}-${i}`}>
-              <title>
-                {name
-                  ? `${name} · ${slot.label} (${slot.pos_group}) · OVR ${slot.madden_ovr ?? '—'} · ${mode === 'unit' ? 'unit' : 'player'} grade ${Math.round(grade ?? slot.strength)} · unit rank ${slot.rank}/${slot.n_teams}`
-                  : `${slot.label} · no starter listed`}
-              </title>
-              <rect x={cx - 15} y={cy - 13} width="30" height="26" rx="5" fill={color}
-                stroke={slot.out ? '#e5604d' : 'rgba(255,255,255,.8)'} strokeWidth={slot.out ? 2 : 1.3} />
-              <text x={cx} y={cy + 3} textAnchor="middle" className="slot-label">{slot.label}</text>
+            <g key={`${slot.label}-${i}`} className="field-slot" opacity={dim ? 0.38 : 1}
+              style={{ cursor: slot.player ? 'pointer' : 'default' }}
+              onMouseEnter={track(slot, i)} onMouseMove={track(slot, i)}>
+              <rect x={cx - 16} y={cy - 12} width="32" height="24" rx="4" fill={color}
+                stroke={active ? '#ffffff' : (slot.out ? '#e5604d' : 'rgba(255,255,255,.9)')}
+                strokeWidth={active ? 2.2 : (slot.out ? 2 : 1.2)} />
+              <text x={cx} y={cy + 3.5} textAnchor="middle" className="slot-label">{slot.label}</text>
               {name && (
-                <text x={cx} y={cy + 24} textAnchor="middle" className="player-label">
-                  {name.length > 14 ? `${name.slice(0, 12)}…` : name}
-                </text>
+                <>
+                  <rect x={cx - plateW / 2} y={cy + 14} width={plateW} height="11" rx="3"
+                    fill="rgba(6,8,11,0.78)" stroke={color} strokeWidth="0.6" />
+                  <text x={cx} y={cy + 21.5} textAnchor="middle" className="player-label">{short}</text>
+                </>
               )}
             </g>
           )
         })}
       </svg>
+
+      {hover?.slot?.player && (() => {
+        const s = hover.slot
+        const g = Math.round((mode === 'unit' ? s.strength : s.grade_pct) ?? s.strength)
+        return (
+          <div className="field-tip" style={{ left: hover.x, top: hover.y }}>
+            <div className="ft-head"><PosTag pos={s.pos_group} /> <b>{s.player}</b>{s.out && <em>OUT</em>}</div>
+            <div className="ft-rows">
+              <span>OVR <b>{s.madden_ovr ?? '—'}</b></span>
+              <span>{mode === 'unit' ? 'Unit' : 'Player'} <b>{g}</b></span>
+              <span>Rank <b>{s.rank}/{s.n_teams}</b></span>
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="field-legend">
         <span><i style={{ background: '#2fbf6c' }} />Strong</span>
         <span><i style={{ background: '#e0b54a' }} />Average</span>
@@ -150,7 +180,7 @@ export function Maxer({ meta }) {
                         <tbody>
                           {r.needs.filter((n) => n.blueprint != null).map((n) => (
                             <tr key={n.pos_group}>
-                              <td>{n.pos_group}</td>
+                              <td><PosTag pos={n.pos_group} /></td>
                               <td className="num">{num(n.strength, 0)}</td>
                               <td className="num">{num(n.blueprint, 0)}</td>
                               <td className="num">{num(n.gap, 0)}</td>

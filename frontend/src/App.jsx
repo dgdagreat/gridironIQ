@@ -38,6 +38,7 @@ export default function App() {
               <button
                 key={s.id}
                 className={section === s.id ? 'active' : ''}
+                aria-current={section === s.id ? 'page' : undefined}
                 onClick={() => setSection(s.id)}
               >
                 {s.label}
@@ -50,6 +51,13 @@ export default function App() {
       <Async state={meta}>
         {(m) => (VIEWS[section] ?? VIEWS.boardroom)(m)}
       </Async>
+
+      <footer className="footer">
+        <div className="inner">
+          <span className="fw">🏈 GridironIQ</span>
+          <span>Cap efficiency, film breakdowns &amp; model grades over the gridiron analytics engine.</span>
+        </div>
+      </footer>
     </>
   )
 }
