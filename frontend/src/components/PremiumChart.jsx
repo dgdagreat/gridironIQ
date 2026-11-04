@@ -11,7 +11,12 @@ const POS_FULL = {
 // league average), built from scratch so the look is ours. Right/green = pay up.
 export function PremiumChart({ data }) {
   const rows = data
-    .map((d) => ({ pos: POS_FULL[d.pos_group] ?? d.pos_group, pp: d.premium * 100 }))
+    .map((d) => ({
+      pos: POS_FULL[d.pos_group] ?? d.pos_group,
+      pp: d.premium * 100,
+      champ: (d.champion_avg ?? 0) * 100,
+      league: (d.league_avg ?? 0) * 100,
+    }))
     .sort((a, b) => b.pp - a.pp)
 
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pp)), 0.01)
@@ -24,7 +29,11 @@ export function PremiumChart({ data }) {
           const w = barW(r.pp)
           const pay = r.pp >= 0
           return (
-            <div className="premium-row" key={r.pos}>
+            <div
+              className="premium-row"
+              key={r.pos}
+              title={`${r.pos}: champions spend ${r.champ.toFixed(1)}% of the cap here vs ${r.league.toFixed(1)}% league average (${r.pp >= 0 ? '+' : ''}${r.pp.toFixed(2)} pts)`}
+            >
               <div className="pos">{r.pos}</div>
               <div className="premium-track">
                 <div

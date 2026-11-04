@@ -3,6 +3,7 @@ import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from './Async.jsx'
 import { Field } from './Field.jsx'
+import { PosTag, POS_COLOR } from './PosTag.jsx'
 import { pct, usd } from '../lib/format.js'
 
 export function TeamExplorer({ meta }) {
@@ -34,9 +35,9 @@ export function TeamExplorer({ meta }) {
                 <div className="rows">
                   {d.positions.map((p) => (
                     <div className="share-row" key={p.pos_group}>
-                      <div className="pos">{p.pos_group}</div>
+                      <div className="pos"><PosTag pos={p.pos_group} /></div>
                       <div className="share-track">
-                        <div className="share-fill" style={{ width: `${((p.cap_pct_norm || 0) / max) * 100}%` }} />
+                        <div className="share-fill" style={{ width: `${((p.cap_pct_norm || 0) / max) * 100}%`, background: POS_COLOR[p.pos_group] || '#8b909b' }} />
                       </div>
                       <div className="usd">{pct(p.cap_pct_norm)}</div>
                     </div>

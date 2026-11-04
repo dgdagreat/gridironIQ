@@ -3,6 +3,7 @@ import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from '../components/Async.jsx'
 import { Field } from '../components/Field.jsx'
+import { PosTag } from '../components/PosTag.jsx'
 
 const GRADE_COLOR = {
   A: 'var(--pay)', B: '#5fce89', C: '#e0b54a', D: 'var(--value)', F: '#e5604d',
@@ -43,7 +44,7 @@ function Board({ title, rows }) {
                 <tr key={`${r.player}-${i}`}>
                   <td>{r.player}</td>
                   <td className="muted">{r.team}</td>
-                  <td>{r.pos_group}</td>
+                  <td><PosTag pos={r.pos_group} /></td>
                   <td className="num">{r.madden_ovr}</td>
                   <td><Grade g={r.grade} /></td>
                   <td className="num">${Number(r.apy).toFixed(1)}M</td>
