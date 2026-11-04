@@ -1,0 +1,55 @@
+name: Deploy to Cloud Run
+
+# Push-to-deploy for the web service (FastAPI API + built React SPA). Builds and
+# deploys via cloudbuild.yaml — the same config used for a manual deploy — so
+# there is a single source of truth for how the image is built and shipped.
+#
+# Auth is Workload Identity Federation (OIDC): GitHub mints a short-lived token
+# and impersonates a dedicated deployer service account. No long-lived GCP JSON
+# key is ever stored in GitHub. One-time setup + the required secrets/variables
+# are documented in README.md ("Push-to-deploy (GitHub Actions)").
+
+on:
+  # Code changes to main.
+  push:
+    branches: [main]
+  # After the daily data refresh finishes: that job commits a fresh DB with
+  # "[skip ci]" (which suppresses the push trigger above), so this workflow_run
+  # hook is what actually ships the updated rosters/cap data.
+  workflow_run:
+    workflows: ["Daily data refresh"]
+    types: [completed]
+  # Manual "Run workflow" button.
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy (Cloud Build → Cloud Run)
+    runs-on: ubuntu-latest
+    # On a workflow_run trigger, only deploy when the refresh actually succeeded.
+    if: >-
+      ${{ github.event_name != 'workflow_run' ||
+          github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      id-token: write          # required to mint the OIDC token for WIF
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image + deploy to Cloud Run
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_REGION=${{ vars.GCP_REGION }},_SERVICE=gridironiq,_REPO=gridironiq

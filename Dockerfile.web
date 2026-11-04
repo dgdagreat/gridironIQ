@@ -1,0 +1,36 @@
+# GridironIQ web service — the FastAPI JSON API plus the built React SPA, served
+# as a single Cloud Run container (one origin, no CORS). The lakehouse/Dagster
+# image is the separate root `Dockerfile`; this one is the deployable web app.
+#
+# Build + deploy: see "Deploy to GCP Cloud Run" in README.md (uses cloudbuild.yaml).
+
+# --- Stage 1: build the React frontend -------------------------------------- #
+FROM node:20-slim AS frontend
+WORKDIR /frontend
+# Copy manifests first for layer caching (package-lock.json may not exist yet).
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build          # -> /frontend/dist
+
+# --- Stage 2: Python runtime (API + static SPA) ----------------------------- #
+FROM python:3.11-slim
+WORKDIR /app
+
+# Editable install so gridiron.config.PROJECT_ROOT (parents[1] of
+# /app/gridiron) resolves to /app and finds /app/data/gridiron.db at runtime.
+COPY pyproject.toml README.md ./
+COPY gridiron ./gridiron
+RUN pip install --no-cache-dir -e .
+
+# The committed, read-only analytics DB. The daily GitHub Action commits a fresh
+# copy back to main, so the next deploy ships updated rosters/cap data.
+COPY data/gridiron.db ./data/gridiron.db
+
+# The built SPA; api.py mounts frontend/dist when it exists.
+COPY --from=frontend /frontend/dist ./frontend/dist
+
+# Cloud Run routes traffic to $PORT (default 8080).
+ENV PORT=8080
+EXPOSE 8080
+CMD ["sh", "-c", "exec uvicorn gridiron.api:app --host 0.0.0.0 --port ${PORT:-8080}"]

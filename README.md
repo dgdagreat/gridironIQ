@@ -186,6 +186,113 @@ python scripts/run_cap_etl.py && python scripts/refresh_rosters.py --force
 
 ---
 
+## Deploy to GCP Cloud Run
+
+The React frontend (`frontend/`) and the FastAPI JSON API (`gridiron/api.py`) ship
+as **one Cloud Run container**: in production the API serves the built SPA, so the
+whole app is a single origin with no CORS. The read-only analytics DB
+(`data/gridiron.db`, ~16 MB) is baked into the image — no managed database — and
+the [daily refresh workflow](.github/workflows/daily-refresh.yml) commits a fresh
+copy to `main`, so each deploy ships updated rosters and cap data.
+
+**Preview the production bundle locally** (the API serving the built SPA at `:8000`):
+
+```bash
+npm --prefix frontend install && npm --prefix frontend run build
+.venv/bin/python -m uvicorn gridiron.api:app --port 8000
+```
+
+**One-time project setup:**
+
+```bash
+export PROJECT_ID=your-gcp-project
+export REGION=us-west1
+gcloud config set project "$PROJECT_ID"
+
+# APIs
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com secretmanager.googleapis.com
+
+# Artifact Registry repo that holds the image
+gcloud artifacts repositories create gridironiq \
+  --repository-format=docker --location="$REGION"
+
+# Let Cloud Build deploy to Cloud Run and act as the runtime service account
+PROJNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+for ROLE in roles/run.admin roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${PROJNUM}@cloudbuild.gserviceaccount.com" --role="$ROLE"
+done
+
+# (Optional) ANTHROPIC_API_KEY for the Film Room breakdown route. Skip this and
+# drop the --set-secrets line in cloudbuild.yaml to deploy without that feature.
+printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets create anthropic-api-key --data-file=-
+gcloud secrets add-iam-policy-binding anthropic-api-key \
+  --member="serviceAccount:${PROJNUM}-compute@developer.gserviceaccount.com" \
+  --role=roles/secretmanager.secretAccessor
+```
+
+**Deploy** (builds `Dockerfile.web`, pushes to Artifact Registry, deploys — one command):
+
+```bash
+gcloud builds submit --config cloudbuild.yaml \
+  --substitutions=_REGION="$REGION",_SERVICE=gridironiq,_REPO=gridironiq
+```
+
+The service scales to zero by default (free tier; ~2–3 s cold start). For a
+zero-cold-start demo link, set `--min-instances=1` in
+[`cloudbuild.yaml`](cloudbuild.yaml) — the one knob that costs a few dollars a month.
+
+### Push-to-deploy (GitHub Actions)
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) deploys on every push
+to `main` **and** again after the daily data refresh finishes (via `workflow_run`),
+so code *and* fresh rosters go live automatically. It authenticates with **Workload
+Identity Federation** — no service-account JSON key is ever stored in GitHub.
+
+One-time setup (pins impersonation to this repo, so nothing else can deploy):
+
+```bash
+export PROJECT_ID=your-gcp-project
+export GH_REPO=dgdagreat/gridironIQ          # owner/repo
+
+gcloud iam service-accounts create github-deployer --display-name="GitHub Actions deployer"
+GH_SA="github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+for ROLE in roles/cloudbuild.builds.editor roles/storage.admin roles/artifactregistry.writer; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${GH_SA}" --role="$ROLE"
+done
+
+gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
+gcloud iam workload-identity-pools providers create-oidc github \
+  --location=global --workload-identity-pool=github --display-name="GitHub OIDC" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='${GH_REPO}'" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+POOL=$(gcloud iam workload-identity-pools describe github --location=global --format='value(name)')
+gcloud iam service-accounts add-iam-policy-binding "$GH_SA" \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/${POOL}/attribute.repository/${GH_REPO}"
+
+# Print the provider resource name for the GitHub secret below:
+gcloud iam workload-identity-pools providers describe github \
+  --location=global --workload-identity-pool=github --format='value(name)'
+```
+
+Then add these under **GitHub → Settings → Secrets and variables → Actions**:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the provider resource name printed above |
+| Secret | `GCP_SERVICE_ACCOUNT` | `github-deployer@PROJECT_ID.iam.gserviceaccount.com` |
+| Variable | `GCP_PROJECT_ID` | your project id |
+| Variable | `GCP_REGION` | `us-west1` |
+
+The Cloud Build and `ANTHROPIC_API_KEY` setup from above still applies (the build
+runs as the Cloud Build service account, which already has `run.admin`).
+
+---
+
 ## The ETL pipeline
 
 `scripts/run_cap_etl.py` → `gridiron.ingestion.load_cap.run_etl()` runs an
