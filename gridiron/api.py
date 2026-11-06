@@ -433,6 +433,42 @@ def film_summary(season: int, game_id: str) -> dict:
         raise HTTPException(404, f"No play-by-play for {game_id}: {exc}") from exc
 
 
+@app.get("/api/film/subtotals")
+def film_subtotals(season: int, game_id: str) -> dict:
+    """Per-quarter running tally for a game: each offense's plays, yards, EPA,
+    EPA/play and success rate, by quarter and for the whole game. Powers the Film
+    Room play-by-play subtotals (the tally shown at the end of each quarter)."""
+    pbp = _pbp(int(season))
+    plays = pbp[(pbp["game_id"] == game_id)
+                & pbp["play_type"].isin(["pass", "run"])].copy()
+    if plays.empty or not {"epa", "posteam"}.issubset(plays.columns):
+        raise HTTPException(404, f"No play-by-play for {game_id}")
+
+    def _subtotal(df: pd.DataFrame) -> list[dict[str, Any]]:
+        g = df.groupby("posteam", dropna=False)
+        out = pd.DataFrame({
+            "plays": g.size(),
+            "yards": g["yards_gained"].sum() if "yards_gained" in df else 0,
+            "epa": g["epa"].sum().round(2),
+            "epa_play": g["epa"].mean().round(3),
+        })
+        if "success" in df.columns:
+            out["success"] = g["success"].mean().round(3)
+        else:  # nflfastR usually ships `success`; fall back to EPA-positive rate.
+            out["success"] = g["epa"].apply(lambda s: float((s > 0).mean())).round(3)
+        return _records(out.reset_index().rename(columns={"posteam": "offense"}))
+
+    def _qlabel(q: int) -> str:
+        return f"Q{q}" if q <= 4 else ("OT" if q == 5 else f"OT{q - 4}")
+
+    by_quarter: list[dict[str, Any]] = []
+    if "qtr" in plays.columns:
+        for q in sorted(plays["qtr"].dropna().unique()):
+            qplays = plays[plays["qtr"] == q]
+            by_quarter.append({"quarter": _qlabel(int(q)), "rows": _subtotal(qplays)})
+    return {"game_id": game_id, "by_quarter": by_quarter, "total": _subtotal(plays)}
+
+
 @app.post("/api/film/breakdown")
 def film_breakdown(body: dict) -> dict:
     """Generate the natural-language film report for a game.

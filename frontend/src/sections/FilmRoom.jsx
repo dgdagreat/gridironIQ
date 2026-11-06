@@ -3,7 +3,63 @@ import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from '../components/Async.jsx'
 import { Field } from '../components/Field.jsx'
-import { num } from '../lib/format.js'
+import { num, pct } from '../lib/format.js'
+
+const sgnEpa = (v, d) =>
+  v == null || Number.isNaN(v) ? '—' : `${v >= 0 ? '+' : ''}${Number(v).toFixed(d)}`
+
+// Per-quarter running tally for a game — each offense's plays, yards, EPA,
+// EPA/play and success rate, by quarter and for the game (collapsed by default).
+function FilmSubtotals({ season, gameId }) {
+  const state = useAsync(() => api.filmSubtotals(season, gameId), [season, gameId])
+  const cells = (r) => (
+    <>
+      <td className="num">{r.plays}</td>
+      <td className="num">{num(r.yards, 0)}</td>
+      <td className="num">{sgnEpa(r.epa, 2)}</td>
+      <td className="num">{sgnEpa(r.epa_play, 3)}</td>
+      <td className="num">{pct(r.success, 0)}</td>
+    </>
+  )
+  return (
+    <Async state={state} empty="No play-by-play detail for this game.">
+      {(d) => (
+        <details className="subtotals">
+          <summary>Play-by-play subtotals — by quarter</summary>
+          <div className="table-scroll">
+            <table className="dtable">
+              <thead>
+                <tr>
+                  <th>Qtr</th><th>Offense</th>
+                  <th className="num">Plays</th><th className="num">Yards</th>
+                  <th className="num">EPA</th><th className="num">EPA/play</th><th className="num">Succ%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.by_quarter.map((q) =>
+                  q.rows.map((r, i) => (
+                    <tr key={`${q.quarter}-${r.offense}`}>
+                      <td>{i === 0 ? q.quarter : ''}</td>
+                      <td>{r.offense}</td>
+                      {cells(r)}
+                    </tr>
+                  )),
+                )}
+                {d.total.map((r, i) => (
+                  <tr key={`total-${r.offense}`} className="total">
+                    <td>{i === 0 ? 'Game' : ''}</td>
+                    <td>{r.offense}</td>
+                    {cells(r)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+    </Async>
+  )
+}
 
 function GameTell({ season, gameId }) {
   const state = useAsync(() => api.filmSummary(season, gameId), [season, gameId])
@@ -48,6 +104,8 @@ function GameTell({ season, gameId }) {
 
               {report.error && <div className="state err" style={{ marginTop: 14 }}>⚠ {report.error.message}</div>}
               {report.text && <div className="report">{report.text}</div>}
+
+              <FilmSubtotals season={season} gameId={gameId} />
             </div>
           )
         }}

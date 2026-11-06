@@ -493,3 +493,16 @@ p, .sub { text-wrap: pretty; }
   .cmp-row { grid-template-columns: 36px 1fr; }
   .radar-svg { max-width: 300px; }
 }
+
+/* ---------------------------------------------------------- film subtotals */
+.subtotals { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+.subtotals > summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--ink-dim);
+}
+.subtotals > summary::-webkit-details-marker { display: none; }
+.subtotals > summary::before { content: '▸'; color: var(--ink-faint); transition: transform 0.15s; }
+.subtotals[open] > summary::before { transform: rotate(90deg); }
+.subtotals > summary:hover { color: var(--ink); }
+.subtotals .dtable { margin-top: 14px; }
+.subtotals .dtable tr.total td { border-top: 1px solid var(--line); font-weight: 600; color: var(--ink); }
