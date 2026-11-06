@@ -1,0 +1,57 @@
+# Build the web image and deploy it to Cloud Run in one command:
+#
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_REGION=us-west1,_SERVICE=gridironiq,_REPO=gridironiq
+#
+# One-time project setup (enable APIs, create the Artifact Registry repo and the
+# ANTHROPIC_API_KEY secret) is documented in README.md.
+
+substitutions:
+  _REGION: us-west1
+  _SERVICE: gridironiq
+  _REPO: gridironiq
+
+images:
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${BUILD_ID}"
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.web
+      - -t
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${BUILD_ID}"
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${BUILD_ID}"
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - "${_SERVICE}"
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${BUILD_ID}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --cpu=1
+      - --memory=1Gi
+      # Scale to zero = stays in the free tier. Cloud Run cold starts are a few
+      # seconds (not Render's minute). For a zero-cold-start demo link, set
+      # --min-instances=1 (this is the one knob that costs a few $/month).
+      - --min-instances=0
+      # The film-breakdown route reads ANTHROPIC_API_KEY from Secret Manager.
+      # Remove this line to deploy without that one feature (it 503s cleanly).
+      - --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

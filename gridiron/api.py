@@ -422,3 +422,38 @@ def film_breakdown(body: dict) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(502, f"Generation failed: {exc}") from exc
     return {"game_id": game_id, "report": report, "model": config.ANTHROPIC_MODEL}
+
+
+# --------------------------------------------------------------------------- #
+# Static frontend
+#
+# In production the built React SPA (``frontend/dist``) is served by this same
+# app, so the whole thing ships as one Cloud Run service: one origin, no CORS.
+# In development the Vite server owns the UI and ``frontend/dist`` won't exist,
+# so the mount is skipped and only the JSON API runs here.
+#
+# This block stays at the end of the module on purpose: the catch-all route
+# below must be registered *after* every ``/api/...`` route so it never shadows
+# them.
+# --------------------------------------------------------------------------- #
+from pathlib import Path as _Path  # noqa: E402
+
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_DIST = _Path(__file__).resolve().parents[1] / "frontend" / "dist"
+
+if _DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    def _spa_index() -> FileResponse:
+        return FileResponse(_DIST / "index.html")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def _spa_fallback(full_path: str) -> FileResponse:
+        """Serve real static files; fall back to index.html for SPA deep links."""
+        candidate = _DIST / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_DIST / "index.html")
