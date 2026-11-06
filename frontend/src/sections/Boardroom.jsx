@@ -4,6 +4,7 @@ import { Async } from '../components/Async.jsx'
 import { PremiumChart } from '../components/PremiumChart.jsx'
 import { VerdictTable } from '../components/VerdictTable.jsx'
 import { TeamExplorer } from '../components/TeamExplorer.jsx'
+import { TeamCompare } from '../components/TeamCompare.jsx'
 import { Archetypes } from '../components/Archetypes.jsx'
 
 export function Boardroom({ meta }) {
@@ -39,7 +40,8 @@ export function Boardroom({ meta }) {
         </div>
       </div>
 
-      <div className="block"><TeamExplorer meta={meta} /></div>
+      <div className="block"><TeamExplorer meta={meta} premium={premium} /></div>
+      <div className="block"><TeamCompare meta={meta} /></div>
       <div className="block"><Archetypes /></div>
     </div>
   )

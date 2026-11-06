@@ -33,6 +33,8 @@ export const api = {
     }),
   valueBoard: (position = 'All', limit = 25) =>
     request(`/api/value-board?position=${encodeURIComponent(position)}&limit=${limit}`),
+  compare: (season, teams) =>
+    request(`/api/compare?season=${season}&teams=${encodeURIComponent(teams.join(','))}`),
   filmGames: (season) => request(`/api/film/games?season=${season}`),
   filmSummary: (season, gameId) =>
     request(`/api/film/summary?season=${season}&game_id=${encodeURIComponent(gameId)}`),
