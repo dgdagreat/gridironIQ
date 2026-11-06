@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from './Async.jsx'
@@ -75,10 +75,35 @@ function niceScale(m) {
 
 const fmtTick = (t) => `${+(t * 100).toFixed(1)}%`
 
+// Spread a row's dots vertically wherever they'd otherwise overlap, so clusters
+// read as a tidy little column (beeswarm) instead of a blurry blob.
+function dodge(points) {
+  const MINGAP = 14, MAXEXT = 10
+  const sorted = [...points].sort((a, b) => a.x - b.x)
+  const clusters = []
+  for (const p of sorted) {
+    const last = clusters[clusters.length - 1]
+    if (last && p.x - last[last.length - 1].x < MINGAP) last.push(p)
+    else clusters.push([p])
+  }
+  const out = []
+  for (const c of clusters) {
+    const n = c.length
+    const spread = n > 1 ? Math.min(9, (2 * MAXEXT) / (n - 1)) : 0
+    c.forEach((p, i) => out.push({ ...p, dy: (i - (n - 1) / 2) * spread }))
+  }
+  return out
+}
+
 // Horizontal dumbbell/dot plot: one row per position, a connector spanning the
 // lowest-to-highest team so the spread reads at a glance, and a dot per team on
-// a shared percentage axis. Rows are grouped offense / defense / special teams.
+// a shared percentage axis. Rows group offense / defense / special teams. Hover
+// a dot or a legend team to trace it across every row; hovering a row lifts it.
 function CompareChart({ data }) {
+  const wrapRef = useRef(null)
+  const [lit, setLit] = useState(null) // highlighted team (legend / dot hover)
+  const [tip, setTip] = useState(null) // { left, top, team, color, pos, val }
+
   const series = data.map((d, i) => ({
     team: d.team,
     color: SERIES[i % SERIES.length],
@@ -90,7 +115,7 @@ function CompareChart({ data }) {
   const max = ticks[ticks.length - 1]
 
   // Geometry (SVG user units; the viewBox scales to the container width).
-  const W = 640, PAD_L = 46, PAD_R = 14, PAD_T = 6, AXIS_H = 26, RH = 30, GH = 26
+  const W = 640, PAD_L = 46, PAD_R = 16, PAD_T = 6, AXIS_H = 26, RH = 32, GH = 26, R = 5
   const x0 = PAD_L, x1 = W - PAD_R
   const xs = (v) => x0 + (v / max) * (x1 - x0)
 
@@ -105,10 +130,23 @@ function CompareChart({ data }) {
   const plotBottom = y
   const H = plotBottom + AXIS_H
 
+  const show = (e, team, color, pos, val) => {
+    const r = wrapRef.current?.getBoundingClientRect()
+    if (!r) return
+    setLit(team)
+    setTip({ left: e.clientX - r.left, top: e.clientY - r.top, team, color, pos, val })
+  }
+  const clear = () => { setLit(null); setTip(null) }
+
   return (
-    <div>
+    <div className="cmp-wrap" ref={wrapRef}>
       <div className="cmp-legend">
-        {series.map((s) => <span key={s.team}><i style={{ background: s.color }} />{s.team}</span>)}
+        {series.map((s) => (
+          <span key={s.team} className={lit && lit !== s.team ? 'off' : ''}
+            onMouseEnter={() => setLit(s.team)} onMouseLeave={() => setLit(null)}>
+            <i style={{ background: s.color }} />{s.team}
+          </span>
+        ))}
       </div>
       <svg className="cmp-svg" viewBox={`0 0 ${W} ${H}`} role="img"
         aria-label="Cap share by position for the selected teams">
@@ -121,31 +159,41 @@ function CompareChart({ data }) {
           </g>
         ))}
 
-        {laid.map((it) =>
-          it.group ? (
-            <text key={`g-${it.group}`} x={0} y={it.y + 16} className="cmp-group">{it.group}</text>
-          ) : (
-            <g key={it.pos}>
-              <text x={PAD_L - 10} y={it.cy} className="cmp-lbl" textAnchor="end" dominantBaseline="middle">{it.pos}</text>
-              {(() => {
-                const vals = series.map((s) => s.map.get(it.pos)).filter((v) => v != null)
-                if (!vals.length) return null
-                const lo = Math.min(...vals), hi = Math.max(...vals)
-                return <line x1={xs(lo)} x2={xs(hi)} y1={it.cy} y2={it.cy} className="cmp-connect" />
-              })()}
-              {series.map((s) => {
-                const v = s.map.get(it.pos)
-                if (v == null) return null
-                return (
-                  <circle key={s.team} className="cmp-pt" cx={xs(v)} cy={it.cy} r={5.5} fill={s.color}>
-                    <title>{`${s.team} · ${it.pos}: ${(v * 100).toFixed(1)}% of cap`}</title>
-                  </circle>
-                )
-              })}
+        {laid.map((it) => {
+          if (it.group) return <text key={`g-${it.group}`} x={0} y={it.y + 16} className="cmp-group">{it.group}</text>
+          const pts = dodge(
+            series
+              .map((s) => ({ team: s.team, color: s.color, v: s.map.get(it.pos) }))
+              .filter((p) => p.v != null)
+              .map((p) => ({ ...p, x: xs(p.v) })),
+          )
+          if (!pts.length) return null
+          const vals = pts.map((p) => p.x)
+          const lo = Math.min(...vals), hiX = Math.max(...vals)
+          return (
+            <g key={it.pos} className="cmp-rowg">
+              <rect className="cmp-band" x={0} y={it.cy - RH / 2} width={W} height={RH} />
+              <text x={PAD_L - 12} y={it.cy} className="cmp-lbl" textAnchor="end" dominantBaseline="middle">{it.pos}</text>
+              <line x1={lo} x2={hiX} y1={it.cy} y2={it.cy} className="cmp-connect"
+                style={{ opacity: lit ? 0.35 : 1 }} />
+              {pts.map((p) => (
+                <circle key={p.team} className="cmp-pt" cx={p.x} cy={it.cy + p.dy} r={R} fill={p.color}
+                  style={{ opacity: lit && lit !== p.team ? 0.18 : 1 }}
+                  onMouseEnter={(e) => show(e, p.team, p.color, it.pos, p.v)}
+                  onMouseMove={(e) => show(e, p.team, p.color, it.pos, p.v)}
+                  onMouseLeave={clear} />
+              ))}
             </g>
-          ),
-        )}
+          )
+        })}
       </svg>
+
+      {tip && (
+        <div className="cmp-tip" style={{ left: tip.left, top: tip.top }}>
+          <div className="t-team"><i style={{ background: tip.color }} />{tip.team}</div>
+          <div className="t-val">{tip.pos} · {(tip.val * 100).toFixed(1)}% of cap</div>
+        </div>
+      )}
     </div>
   )
 }

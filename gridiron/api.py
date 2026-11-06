@@ -469,6 +469,52 @@ def film_subtotals(season: int, game_id: str) -> dict:
     return {"game_id": game_id, "by_quarter": by_quarter, "total": _subtotal(plays)}
 
 
+@app.get("/api/film/plays")
+def film_plays(season: int, game_id: str) -> dict:
+    """Every individual play in a game — ordered, numbered, and tagged with its
+    EPA, grouped by quarter. Powers the Film Room per-play log."""
+    pbp = _pbp(int(season))
+    g = pbp[pbp["game_id"] == game_id].copy()
+    if g.empty or "epa" not in g.columns:
+        raise HTTPException(404, f"No play-by-play for {game_id}")
+    # Real snaps only: drop the GAME marker, timeouts and penalty-only no-plays.
+    g = g[g["posteam"].notna() & g["play_type"].notna() & (g["play_type"] != "no_play")]
+    for col in ("play_id", "order_sequence"):
+        if col in g.columns:
+            g = g.sort_values(col)
+            break
+
+    def _opt(v, cast):
+        return None if pd.isna(v) else cast(v)
+
+    def _row(n: int, r: pd.Series) -> dict[str, Any]:
+        return {
+            "n": n,
+            "offense": _opt(r.get("posteam"), str),
+            "down": _opt(r.get("down"), int),
+            "ydstogo": _opt(r.get("ydstogo"), int),
+            "play_type": _opt(r.get("play_type"), str),
+            "yards": _opt(r.get("yards_gained"), int),
+            "epa": _opt(r.get("epa"), lambda v: round(float(v), 2)),
+            "desc": "" if pd.isna(r.get("desc")) else str(r["desc"]),
+        }
+
+    def _qlabel(q: int) -> str:
+        return f"Q{q}" if q <= 4 else ("OT" if q == 5 else f"OT{q - 4}")
+
+    by_quarter: list[dict[str, Any]] = []
+    n = 0
+    quarters = sorted(g["qtr"].dropna().unique()) if "qtr" in g.columns else [None]
+    for q in quarters:
+        qrows = g if q is None else g[g["qtr"] == q]
+        plays = []
+        for _, r in qrows.iterrows():
+            n += 1
+            plays.append(_row(n, r))
+        by_quarter.append({"quarter": "" if q is None else _qlabel(int(q)), "plays": plays})
+    return {"game_id": game_id, "plays": int(n), "by_quarter": by_quarter}
+
+
 @app.post("/api/film/breakdown")
 def film_breakdown(body: dict) -> dict:
     """Generate the natural-language film report for a game.

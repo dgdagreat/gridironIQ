@@ -40,6 +40,8 @@ export const api = {
     request(`/api/film/summary?season=${season}&game_id=${encodeURIComponent(gameId)}`),
   filmSubtotals: (season, gameId) =>
     request(`/api/film/subtotals?season=${season}&game_id=${encodeURIComponent(gameId)}`),
+  filmPlays: (season, gameId) =>
+    request(`/api/film/plays?season=${season}&game_id=${encodeURIComponent(gameId)}`),
   filmBreakdown: (season, gameId) =>
     request('/api/film/breakdown', {
       method: 'POST',
