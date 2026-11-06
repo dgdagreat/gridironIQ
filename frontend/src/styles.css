@@ -510,6 +510,32 @@ p, .sub { text-wrap: pretty; }
   .radar-svg { max-width: 300px; }
 }
 
+/* ------------------------------------------------------------- film play log */
+.playlog { margin-top: 20px; }
+.playlog-head { font-size: 13px; font-weight: 600; color: var(--ink-dim); margin-bottom: 10px; }
+.playlog-scroll {
+  max-height: 520px; overflow-y: auto;
+  border: 1px solid var(--line-soft); border-radius: 10px;
+}
+.playlog .dtable { width: 100%; margin: 0; }
+.playlog .dtable thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface); padding: 10px 12px 9px;
+}
+.playlog .dtable td { vertical-align: top; }
+.playlog td.muted { color: var(--ink-faint); }
+.playlog td.desc {
+  white-space: normal; min-width: 240px; max-width: 460px;
+  color: var(--ink-dim); font-size: 12.5px; line-height: 1.4;
+}
+.playlog tr.qhead td {
+  background: var(--surface-2); color: var(--ink-faint);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 6px 12px;
+}
+.epa-pos { color: var(--pay); font-weight: 600; }
+.epa-neg { color: var(--value); font-weight: 600; }
+
 /* ---------------------------------------------------------- film subtotals */
 .subtotals { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
 .subtotals > summary {

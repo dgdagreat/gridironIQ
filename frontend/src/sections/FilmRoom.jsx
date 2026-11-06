@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAsync } from '../lib/useAsync.js'
 import { Async } from '../components/Async.jsx'
@@ -7,6 +7,50 @@ import { num, pct } from '../lib/format.js'
 
 const sgnEpa = (v, d) =>
   v == null || Number.isNaN(v) ? '—' : `${v >= 0 ? '+' : ''}${Number(v).toFixed(d)}`
+
+const downDist = (r) => (r.down == null ? '—' : `${r.down} & ${r.ydstogo ?? '—'}`)
+
+// The full play log: every snap in the game, numbered in order and grouped by
+// quarter, each with its own EPA (green = positive, amber = negative).
+function FilmPlays({ season, gameId }) {
+  const state = useAsync(() => api.filmPlays(season, gameId), [season, gameId])
+  return (
+    <Async state={state} empty="No play-by-play detail for this game.">
+      {(d) => (
+        <div className="playlog">
+          <div className="playlog-head">Every play — {d.plays} snaps, each with its EPA</div>
+          <div className="playlog-scroll">
+            <table className="dtable">
+              <thead>
+                <tr>
+                  <th className="num">#</th><th>Off</th><th>Dn &amp; Dist</th>
+                  <th>Play</th><th className="num">Yds</th><th className="num">EPA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.by_quarter.map((q) => (
+                  <Fragment key={q.quarter}>
+                    {q.quarter && <tr className="qhead"><td colSpan={6}>{q.quarter}</td></tr>}
+                    {q.plays.map((r) => (
+                      <tr key={r.n}>
+                        <td className="num muted">{r.n}</td>
+                        <td>{r.offense}</td>
+                        <td className="muted">{downDist(r)}</td>
+                        <td className="desc">{r.desc}</td>
+                        <td className="num">{r.yards == null ? '—' : r.yards}</td>
+                        <td className={`num ${r.epa == null ? '' : r.epa >= 0 ? 'epa-pos' : 'epa-neg'}`}>{sgnEpa(r.epa, 2)}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Async>
+  )
+}
 
 // Per-quarter running tally for a game — each offense's plays, yards, EPA,
 // EPA/play and success rate, by quarter and for the game (collapsed by default).
@@ -24,8 +68,8 @@ function FilmSubtotals({ season, gameId }) {
   return (
     <Async state={state} empty="No play-by-play detail for this game.">
       {(d) => (
-        <details className="subtotals" open>
-          <summary>Play-by-play — by quarter</summary>
+        <details className="subtotals">
+          <summary>Quarter subtotals</summary>
           <div className="table-scroll">
             <table className="dtable">
               <thead>
@@ -95,6 +139,7 @@ function GameTell({ season, gameId }) {
                 </div>
               )}
 
+              <FilmPlays season={season} gameId={gameId} />
               <FilmSubtotals season={season} gameId={gameId} />
 
               <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
