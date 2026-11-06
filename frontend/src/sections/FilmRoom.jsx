@@ -24,8 +24,8 @@ function FilmSubtotals({ season, gameId }) {
   return (
     <Async state={state} empty="No play-by-play detail for this game.">
       {(d) => (
-        <details className="subtotals">
-          <summary>Play-by-play subtotals — by quarter</summary>
+        <details className="subtotals" open>
+          <summary>Play-by-play — by quarter</summary>
           <div className="table-scroll">
             <table className="dtable">
               <thead>
@@ -95,6 +95,8 @@ function GameTell({ season, gameId }) {
                 </div>
               )}
 
+              <FilmSubtotals season={season} gameId={gameId} />
+
               <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                 <button className="btn" onClick={write} disabled={report.loading}>
                   {report.loading ? 'Writing…' : 'Generate film report'}
@@ -104,8 +106,6 @@ function GameTell({ season, gameId }) {
 
               {report.error && <div className="state err" style={{ marginTop: 14 }}>⚠ {report.error.message}</div>}
               {report.text && <div className="report">{report.text}</div>}
-
-              <FilmSubtotals season={season} gameId={gameId} />
             </div>
           )
         }}
