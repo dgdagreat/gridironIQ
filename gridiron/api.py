@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from gridiron import config, db
-from gridiron.ingestion.reference import canonical_team
+from gridiron.ingestion.reference import DIVISIONS, canonical_team
 from gridiron.modeling import (cap_efficiency, clustering, roster_strength, sb_maxer,
                                trade_market, value_board)
 
@@ -74,6 +74,7 @@ def meta() -> dict:
         "teams": teams,
         "current_season": config.CURRENT_SEASON,
         "projection_season": config.PROJECTION_SEASON,
+        "divisions": {k: list(v) for k, v in DIVISIONS.items()},
     }
 
 
@@ -109,12 +110,44 @@ def team_season(team: str, season: int) -> dict:
         "AND cap_number IS NOT NULL ORDER BY cap_number DESC",
         t=team, s=season,
     )
+    # On-field efficiency (nflfastR EPA from the PBP lakehouse), with the team's
+    # net-EPA/play rank for the season — powers the Boardroom "did the cap
+    # allocation translate?" panel. Absent for projected/future seasons.
+    epa: dict[str, Any] | None = None
+    if db.table_exists("pbp_team_season_epa"):
+        season_epa = db.query(
+            "SELECT * FROM pbp_team_season_epa WHERE season = :s", s=season)
+        if not season_epa.empty and (season_epa["team"] == team).any():
+            row = season_epa.set_index("team").loc[team]
+            epa = _records(season_epa[season_epa["team"] == team])[0]
+            epa["net_epa_rank"] = int((season_epa["net_epa_play"] > row["net_epa_play"]).sum()) + 1
+            epa["n_teams"] = int(len(season_epa))
     return {
         "team": team,
         "season": season,
+        "league_cap": config.LEAGUE_SALARY_CAP.get(season),
         "positions": _records(positions),
         "players": _records(players),
+        "epa": epa,
     }
+
+
+@app.get("/api/compare")
+def compare(season: int, teams: str) -> list[dict]:
+    """Normalized positional cap share for up to six teams in a season — powers
+    the Boardroom head-to-head / division comparison. ``teams`` is comma-separated
+    (e.g. ``?season=2026&teams=KC,BUF,PHI``)."""
+    wanted = [canonical_team(t.strip()) for t in teams.split(",") if t.strip()][:6]
+    out: list[dict[str, Any]] = []
+    for t in wanted:
+        df = db.query(
+            "SELECT pos_group, cap_pct_norm FROM positional_spending "
+            "WHERE team = :t AND season = :s ORDER BY cap_pct_norm DESC",
+            t=t, s=season,
+        )
+        if not df.empty:
+            out.append({"team": t, "positions": _records(df)})
+    return out
 
 
 @app.get("/api/archetypes")
