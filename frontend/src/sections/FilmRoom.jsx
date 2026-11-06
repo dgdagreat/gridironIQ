@@ -16,8 +16,8 @@ function FilmSubtotals({ season, gameId }) {
     <>
       <td className="num">{r.plays}</td>
       <td className="num">{num(r.yards, 0)}</td>
-      <td className="num">{sgnEpa(r.epa, 2)}</td>
       <td className="num">{sgnEpa(r.epa_play, 3)}</td>
+      <td className="num">{sgnEpa(r.epa, 2)}</td>
       <td className="num">{pct(r.success, 0)}</td>
     </>
   )
@@ -32,7 +32,7 @@ function FilmSubtotals({ season, gameId }) {
                 <tr>
                   <th>Qtr</th><th>Offense</th>
                   <th className="num">Plays</th><th className="num">Yards</th>
-                  <th className="num">EPA</th><th className="num">EPA/play</th><th className="num">Succ%</th>
+                  <th className="num">EPA/play</th><th className="num">Qtr EPA</th><th className="num">Succ%</th>
                 </tr>
               </thead>
               <tbody>
