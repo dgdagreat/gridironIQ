@@ -76,7 +76,12 @@ gridiron/ingestion       SQLite, tracked      FastAPI, /api/*  └► app/stream
   into `data/raw/pbp_<season>.parquet` (1h TTL) and cached in memory in `api.py`, so
   the first hit for a season is slow and needs network.
 - **`gridiron/api.py`** converts DataFrames with `_records(df)` (NaN → null, numpy →
-  native). The block at the end of the module mounts `frontend/dist` when it exists
+  native). Anything derived only from the DB is memoized with `@_snapshot_cache()`,
+  which is keyed on the DB file's mtime; the cached frames are shared across
+  requests, so copy before mutating one. Successful `GET /api/*` responses are
+  sent with `max-age=300` (the Vite dev proxy rewrites it to `no-store`).
+  scikit-learn is imported inside the archetypes route to keep it out of cold
+  start, so don't import `clustering` at module level. The block at the end of the module mounts `frontend/dist` when it exists
   and registers a catch-all SPA fallback; it must stay last so it never shadows an
   `/api/...` route. CORS only allows the Vite dev/preview origins because production
   is same-origin.

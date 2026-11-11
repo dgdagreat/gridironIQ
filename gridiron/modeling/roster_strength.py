@@ -12,6 +12,7 @@ the league," which is the axis the Super Bowl Maxer measures gaps on.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 #: How many players define a "unit" at each position (starters + key rotation).
@@ -244,30 +245,47 @@ def compute_unit_strength(players: pd.DataFrame) -> pd.DataFrame:
     for col, dflt in (("depth_rank", pd.NA), ("currently_out", False)):
         if col not in scored:
             scored[col] = dflt
-    out_now = scored["currently_out"].fillna(False).astype(bool)
+
+    # Pick every unit's starters in one pass over the league rather than one
+    # filter + sort per team × position (the simulate route rescores all ~420
+    # units on every move, and that loop was nearly all of its time).
+    keys = ["team", "pos_group"]
+    pool = scored[keys + ["depth_rank", "talent", "player"]].assign(
+        _out=scored["currently_out"].fillna(False).astype(bool)).dropna(subset=keys)
+    # Drop players ruled out now; if that empties the group (bad data / a whole
+    # unit on the report), fall back to everyone so a team never grades as 0.
+    all_out = pool.groupby(keys)["_out"].transform("all")
+    pool = pool[~pool["_out"] | all_out]
+    # Starters first (lowest depth rank), best talent breaking ties / filling.
+    # The sort is stable, so within a unit this is the order a per-unit sort gives.
+    pool = pool.sort_values(keys + ["depth_rank", "talent"],
+                            ascending=[True, True, True, False], na_position="last")
+    by_unit = pool.groupby(keys, sort=False)
+    n_players = by_unit.size().to_numpy()
+    top = pool[by_unit.cumcount() < pool["pos_group"].map(UNIT_SIZE).fillna(3)]
+
+    # ``pool`` is sorted by unit, so each unit's starters are one contiguous run.
+    unit_id = top.groupby(keys, sort=False).ngroup().to_numpy()
+    starts = np.flatnonzero(np.diff(unit_id, prepend=-1))
+    ends = np.append(starts[1:], len(unit_id))
+    teams = top["team"].to_numpy(dtype=object)
+    positions = top["pos_group"].to_numpy(dtype=object)
+    names = top["player"].to_numpy(dtype=object)
+    talent = top["talent"].to_numpy(dtype=float)
 
     rows: list[dict] = []
-    for (team, pos), grp in scored.groupby(["team", "pos_group"]):
-        k = UNIT_SIZE.get(pos, 3)
-        # Drop players ruled out now; if that empties the group (bad data / a whole
-        # unit on the report), fall back to everyone so a team never grades as 0.
-        avail = grp[~out_now.loc[grp.index]]
-        pool = avail if not avail.empty else grp
-        # Starters first (lowest depth rank), best talent breaking ties / filling.
-        top = pool.sort_values(["depth_rank", "talent"], ascending=[True, False],
-                               na_position="last").head(k)
-        t = top["talent"].sort_values(ascending=False)
+    for i, (lo, hi) in enumerate(zip(starts, ends)):
+        t = pd.Series(-np.sort(-talent[lo:hi]))        # best first, NaN last
         # Star-weighted: the best starter carries the unit (an elite anchor like a
         # top QB or interior lineman shouldn't grade out poorly just because the
         # depth behind him is thin), tempered by the quality of that depth.
-        unit = (STAR_WEIGHT * float(t.iloc[0]) + (1 - STAR_WEIGHT) * float(t.mean())
-                if len(t) else UNRATED_TALENT)
+        unit = STAR_WEIGHT * float(t.iloc[0]) + (1 - STAR_WEIGHT) * float(t.mean())
         rows.append({
-            "team": team,
-            "pos_group": pos,
+            "team": teams[lo],
+            "pos_group": positions[lo],
             "unit_score": round(unit, 4),
-            "n_players": int(len(pool)),
-            "top_player": top.loc[top["talent"].idxmax(), "player"] if len(top) else None,
+            "n_players": int(n_players[i]),
+            "top_player": names[lo + int(np.nanargmax(talent[lo:hi]))],
         })
     units = pd.DataFrame(rows)
 

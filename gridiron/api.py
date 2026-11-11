@@ -11,21 +11,33 @@ frontend; this layer exposes the same analytics so the React build can port each
 panel one at a time. Parity today: the full Boardroom (champion premium, the
 efficiency verdict, team spending, archetypes) and the Film Room (schedule, a
 no-LLM game summary, and the Anthropic-written breakdown).
+
+Performance: the analytics tables only change when the refresh scripts rewrite
+the DB, so everything derived from them is memoized per DB snapshot
+(``_snapshot_cache``). Responses are gzipped and successful GETs are
+browser-cacheable for a few minutes (``API_MAX_AGE_SECONDS``).
 """
 from __future__ import annotations
 
+import functools
 import json
+import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
 from gridiron import config, db
 from gridiron.ingestion.reference import DIVISIONS, canonical_team
-from gridiron.modeling import (cap_efficiency, clustering, roster_strength, sb_maxer,
+# ``clustering`` is imported inside its route: it pulls in scikit-learn, which is
+# about 70% of this module's import time and only the archetypes panel needs it.
+from gridiron.modeling import (cap_efficiency, roster_strength, sb_maxer,
                                trade_market, value_board)
 
 app = FastAPI(title="GridironIQ API", version="0.1.0")
@@ -40,6 +52,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# JSON and the SPA bundle compress 4-5x; bodies under 1 KB are not worth the CPU.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+#: How long a browser may reuse a successful ``GET /api/...`` response. The data
+#: behind them changes at most daily (the DB refresh) or hourly (live
+#: play-by-play), so five minutes is invisible staleness and makes moving between
+#: sections instant. The Vite dev proxy strips the header (``vite.config.js``).
+API_MAX_AGE_SECONDS = 300
+
+
+@app.middleware("http")
+async def _cache_headers(request: Request, call_next):
+    """Set ``Cache-Control`` on successful GETs that do not set their own."""
+    response = await call_next(request)
+    if (request.method == "GET" and response.status_code == 200
+            and "cache-control" not in response.headers):
+        path = request.url.path
+        if path.startswith("/assets/"):
+            # Vite fingerprints these filenames, so a given URL never changes.
+            policy = "public, max-age=31536000, immutable"
+        elif path == "/api/health":
+            policy = "no-store"
+        elif path.startswith("/api/"):
+            policy = f"public, max-age={API_MAX_AGE_SECONDS}"
+        else:
+            # index.html (and SPA deep links): revalidate, so a deploy's new
+            # asset URLs are picked up on the next load.
+            policy = "no-cache"
+        response.headers["Cache-Control"] = policy
+    return response
 
 
 def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
@@ -52,9 +94,57 @@ def _records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return json.loads(df.to_json(orient="records"))
 
 
+def _db_stamp() -> float:
+    """Identity of the DB snapshot being served: the SQLite file's mtime."""
+    try:
+        return config.DB_PATH.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _snapshot_cache(*, ttl: float | None = None, maxsize: int = 32) -> Callable:
+    """Memoize a function of the DB's contents until the DB file changes.
+
+    The analytics tables are rewritten only by the refresh scripts, so anything
+    derived purely from them is constant for a given DB file and is computed once
+    per snapshot (per distinct positional arguments, up to ``maxsize``). ``ttl``
+    additionally expires entries by age, for results that also depend on the
+    schedule feed. One lock per function means concurrent first requests wait for
+    a single computation instead of each repeating it.
+
+    Cached values are shared between requests: treat them as read-only.
+    """
+    def decorate(fn: Callable) -> Callable:
+        lock = threading.Lock()
+        entries: dict[tuple, tuple[float, Any]] = {}
+        seen_stamp: list[float | None] = [None]
+
+        @functools.wraps(fn)
+        def wrapper(*args):
+            stamp, now = _db_stamp(), time.monotonic()
+            with lock:
+                if seen_stamp[0] != stamp:
+                    entries.clear()
+                    seen_stamp[0] = stamp
+                hit = entries.get(args)
+                if hit is not None and (ttl is None or now - hit[0] < ttl):
+                    return hit[1]
+                value = fn(*args)
+                entries.pop(args, None)
+                while len(entries) >= maxsize:
+                    del entries[next(iter(entries))]
+                entries[args] = (now, value)
+                return value
+
+        wrapper.cache_clear = entries.clear
+        return wrapper
+    return decorate
+
+
 # --------------------------------------------------------------------------- #
 # Meta — powers the UI's season/team dropdowns
 # --------------------------------------------------------------------------- #
+@_snapshot_cache()
 def _seasons_teams() -> tuple[list[int], list[str]]:
     df = db.query("SELECT DISTINCT season, team FROM positional_spending")
     return (sorted((int(s) for s in df["season"].unique()), reverse=True),
@@ -81,16 +171,26 @@ def meta() -> dict:
 # --------------------------------------------------------------------------- #
 # Boardroom
 # --------------------------------------------------------------------------- #
+@_snapshot_cache()
+def _champion_premium() -> list[dict]:
+    return _records(cap_efficiency.champion_premium().reset_index())
+
+
+@_snapshot_cache()
+def _efficiency_verdict() -> list[dict]:
+    return _records(cap_efficiency.efficiency_verdict().reset_index())
+
+
 @app.get("/api/champion-premium")
 def champion_premium() -> list[dict]:
     """Per-position: champion cap share vs. the league, and the gap."""
-    return _records(cap_efficiency.champion_premium().reset_index())
+    return _champion_premium()
 
 
 @app.get("/api/efficiency-verdict")
 def efficiency_verdict() -> list[dict]:
     """Premium + spend/win correlation rolled into a per-position verdict."""
-    return _records(cap_efficiency.efficiency_verdict().reset_index())
+    return _efficiency_verdict()
 
 
 @app.get("/api/team-season/{team}/{season}")
@@ -150,11 +250,10 @@ def compare(season: int, teams: str) -> list[dict]:
     return out
 
 
-@app.get("/api/archetypes")
-def archetypes(k: int = 5) -> dict:
-    """K-means spending archetypes with each cluster's SB success rate."""
-    if not 2 <= k <= 10:
-        raise HTTPException(400, "k must be between 2 and 10")
+@_snapshot_cache()
+def _archetypes(k: int) -> dict:
+    from gridiron.modeling import clustering
+
     res = clustering.cluster_archetypes(k=k)
     success = res.success.join(res.profiles["label"]).reset_index()
     return {
@@ -164,15 +263,47 @@ def archetypes(k: int = 5) -> dict:
     }
 
 
+@app.get("/api/archetypes")
+def archetypes(k: int = 5) -> dict:
+    """K-means spending archetypes with each cluster's SB success rate."""
+    if not 2 <= k <= 10:
+        raise HTTPException(400, "k must be between 2 and 10")
+    return _archetypes(k)
+
+
 # --------------------------------------------------------------------------- #
 # Super Bowl Maxer + Value Board
 # --------------------------------------------------------------------------- #
+@_snapshot_cache()
 def _player_talent() -> pd.DataFrame:
     return db.read_table("player_talent")
 
 
+@_snapshot_cache()
 def _roster_strength() -> pd.DataFrame:
     return db.read_table("roster_strength")
+
+
+@_snapshot_cache()
+def _free_agents() -> pd.DataFrame | None:
+    """The free-agent pool, or ``None`` when the refresh has not produced one."""
+    return db.read_table("free_agents") if db.table_exists("free_agents") else None
+
+
+#: The league baseline also depends on the schedule feed (this season's results
+#: move the outlook), which ``schedules`` refreshes every 12 hours.
+_LEAGUE_BASELINE_TTL_SECONDS = 600
+
+
+@_snapshot_cache(ttl=_LEAGUE_BASELINE_TTL_SECONDS)
+def _league_baseline() -> tuple[sb_maxer.LeagueInputs, pd.DataFrame]:
+    """The roster-independent outlook inputs and the stored rosters' league table.
+
+    Both are the same for every team, so a Maxer request reuses them; a
+    simulation reuses the inputs to rescore the roster it changed.
+    """
+    inputs = sb_maxer.league_inputs()
+    return inputs, sb_maxer.league_table(_roster_strength(), inputs=inputs)
 
 
 @app.get("/api/maxer/{team}")
@@ -180,13 +311,14 @@ def maxer(team: str) -> dict:
     """Team outlook, needs, available free agents and trade targets."""
     try:
         strength = _roster_strength()
-        report = sb_maxer.team_report(team, strength)
+        inputs, league = _league_baseline()
+        report = sb_maxer.team_report(team, strength, inputs=inputs, table=league)
     except (KeyError, FileNotFoundError) as exc:
         raise HTTPException(404, f"No roster data for {team}") from exc
     players = _player_talent()
     needs = report["top_needs"]
-    if db.table_exists("free_agents"):
-        fa = db.read_table("free_agents")
+    fa = _free_agents()
+    if fa is not None:
         need_order = {pos: idx for idx, pos in enumerate(needs)}
         fa = fa.assign(_need=fa["pos_group"].map(need_order).fillna(99))
         fa = fa.sort_values(["_need", "talent"], ascending=[True, False]).head(30)
@@ -195,9 +327,8 @@ def maxer(team: str) -> dict:
     else:
         fa = pd.DataFrame()
     targets = trade_market.trade_board(players, team, needs, per_need=6)
-    league = sb_maxer.league_table(strength)
+    starters = _starter_board(team, players, strength, report["needs"])
     report["needs"] = _records(report["needs"])
-    starters = _starter_board(team, players, strength)
     return {
         "team": team,
         "report": report,
@@ -220,25 +351,44 @@ _FORMATION = [
 ]
 
 
-def _starter_board(team: str, players: pd.DataFrame,
-                   strength: pd.DataFrame) -> list[dict[str, Any]]:
-    """Assign likely starters to the same 11-personnel vs nickel field as Streamlit."""
+def _talent_percentiles(players: pd.DataFrame) -> pd.Series | None:
+    """Each player's talent as a percentile (0-100) of the starters at his position.
+
+    The comparison population is the position's depth-chart starters, as in
+    Streamlit (everyone graded at the position when it has no starters). A sorted
+    reference plus a binary search does this in one pass per position instead of
+    one scan of the starters per player. ``None`` when there are no talent scores.
+    """
+    if "talent" not in players:
+        return None
+    starter = (players["depth_rank"].eq(1) if "depth_rank" in players
+               else pd.Series(True, index=players.index))
+    pct = pd.Series(np.nan, index=players.index, dtype=float)
+    for _, group in players.groupby("pos_group"):
+        talent = group["talent"]
+        ref = talent[starter.loc[group.index]].dropna()
+        if ref.empty:
+            ref = talent.dropna()
+        if ref.empty:
+            continue
+        values = talent.to_numpy(dtype=float)
+        at_or_below = np.searchsorted(np.sort(ref.to_numpy(dtype=float)), values,
+                                      side="right")
+        pct.loc[group.index] = np.where(np.isnan(values), np.nan,
+                                        at_or_below / len(ref) * 100)
+    return pct
+
+
+def _starter_board(team: str, players: pd.DataFrame, strength: pd.DataFrame,
+                   needs: pd.DataFrame) -> list[dict[str, Any]]:
+    """Assign likely starters to the same 11-personnel vs nickel field as Streamlit.
+
+    ``needs`` is the team report's needs frame for this same ``strength``.
+    """
     pool = players[players["team"] == team].copy()
-    if "talent" in players:
-        players = players.copy()
-        players["_starter"] = (players["depth_rank"].eq(1)
-                               if "depth_rank" in players else True)
-        players["talent_pct"] = float("nan")
-        for _, group in players.groupby("pos_group"):
-            ref = group.loc[group["_starter"], "talent"].dropna()
-            if ref.empty:
-                ref = group["talent"].dropna()
-            players.loc[group.index, "talent_pct"] = group["talent"].rank(pct=True).mul(100)
-            if not ref.empty:
-                # Use the starter pool as the comparison population, as in Streamlit.
-                players.loc[group.index, "talent_pct"] = group["talent"].apply(
-                    lambda value: float((ref <= value).mean()) * 100 if pd.notna(value) else float("nan"))
-        pool = players[players["team"] == team].copy()
+    talent_pct = _talent_percentiles(players)
+    if talent_pct is not None:
+        pool["talent_pct"] = talent_pct.loc[pool.index]
     pool["_out"] = (pool["currently_out"].fillna(False).astype(bool)
                     if "currently_out" in pool else False)
     sort_cols, ascending = ["_out"], [True]
@@ -247,7 +397,9 @@ def _starter_board(team: str, players: pd.DataFrame,
     for col, direction in (("madden_ovr", False), ("talent", False)):
         if col in pool:
             sort_cols.append(col); ascending.append(direction)
-    needs = sb_maxer.team_report(team, strength)["needs"].set_index("pos_group")
+    needs = needs.set_index("pos_group")
+    # One stable sort up front; filtering it per slot keeps each position's order.
+    pool = pool.sort_values(sort_cols, ascending=ascending, na_position="last")
     ranked = strength.assign(
         rank=strength.groupby("pos_group")["strength"].rank(ascending=False, method="min"))
     team_rank = ranked[ranked["team"] == team].set_index("pos_group")["rank"]
@@ -255,8 +407,7 @@ def _starter_board(team: str, players: pd.DataFrame,
     used: set[Any] = set()
     out: list[dict[str, Any]] = []
     for label, pos, x, y, bucket in _FORMATION:
-        group = pool[pool["pos_group"] == pos].sort_values(
-            sort_cols, ascending=ascending, na_position="last")
+        group = pool[pool["pos_group"] == pos]
         candidates = ([group[group["depth_chart_position"] == bucket]] if bucket and
                       "depth_chart_position" in group else []) + [group]
         selected = None
@@ -303,7 +454,8 @@ def maxer_simulate(team: str, body: MaxerSimulationRequest) -> dict:
         raise HTTPException(400, "Select no more than 12 total moves")
     try:
         strength = _roster_strength()
-        baseline = sb_maxer.team_report(team, strength)
+        inputs, league = _league_baseline()
+        baseline = sb_maxer.team_report(team, strength, inputs=inputs, table=league)
         players = _player_talent().copy()
     except (KeyError, FileNotFoundError) as exc:
         raise HTTPException(404, f"No roster data for {team}") from exc
@@ -320,9 +472,9 @@ def maxer_simulate(team: str, body: MaxerSimulationRequest) -> dict:
         players.loc[moved, "depth_rank"] = 0
         players.loc[moved, "currently_out"] = False
     if signed:
-        if not db.table_exists("free_agents"):
+        fa = _free_agents()
+        if fa is None:
             raise HTTPException(404, "Free-agent data is unavailable")
-        fa = db.read_table("free_agents")
         adds = fa[fa["player"].isin(signed)].copy()
         if len(adds) != len(signed):
             raise HTTPException(400, "One or more selected free agents are unavailable")
@@ -332,12 +484,12 @@ def maxer_simulate(team: str, body: MaxerSimulationRequest) -> dict:
         players = pd.concat([players, adds], ignore_index=True)
     if traded or signed:
         strength = roster_strength.compute_unit_strength(players)
-    report = sb_maxer.team_report(team, strength)
-    league = sb_maxer.league_table(strength)
+        league = sb_maxer.league_table(strength, inputs=inputs)
+    report = sb_maxer.team_report(team, strength, inputs=inputs, table=league)
     return {
         "report": {**report, "needs": _records(report["needs"])},
         "league": _records(league),
-        "starters": _starter_board(team, players, strength),
+        "starters": _starter_board(team, players, strength, report["needs"]),
         "signed": signed,
         "traded": traded,
         "readiness_delta": round(report["readiness"] - baseline["readiness"], 1),
@@ -345,24 +497,18 @@ def maxer_simulate(team: str, body: MaxerSimulationRequest) -> dict:
     }
 
 
-_VALUE_BOARD_CACHE: tuple[float, pd.DataFrame] | None = None
-
-
+@_snapshot_cache()
 def _value_board() -> pd.DataFrame:
-    """Build the value board once per DB snapshot, keyed on the DB file's mtime.
+    """The value board for this DB snapshot.
 
-    ``build_value_board`` scans all player value data (a few seconds); the
-    position filter is applied afterward, so the board is reused across requests
-    until the daily DB refresh changes the file's mtime.
+    The roster refresh persists it as the ``value_board`` table (the one the
+    Streamlit app reads), so serve that. Rebuilding it means parsing the raw
+    contracts file: about two seconds, plus a download on a fresh container. That
+    stays only as the fallback for a DB that predates the table.
     """
-    global _VALUE_BOARD_CACHE
-    try:
-        mtime = config.DB_PATH.stat().st_mtime
-    except OSError:
-        mtime = 0.0
-    if _VALUE_BOARD_CACHE is None or _VALUE_BOARD_CACHE[0] != mtime:
-        _VALUE_BOARD_CACHE = (mtime, value_board.build_value_board(_player_talent()))
-    return _VALUE_BOARD_CACHE[1]
+    if db.table_exists("value_board"):
+        return db.read_table("value_board")
+    return value_board.build_value_board(_player_talent())
 
 
 @app.get("/api/value-board")
@@ -401,22 +547,39 @@ def film_games(season: int) -> list[dict]:
 
 _PBP_CACHE: dict[int, tuple[float, pd.DataFrame]] = {}
 _PBP_CACHE_TTL_SECONDS = 3600
+_PBP_LOAD_LOCK = threading.Lock()
 
 
 def _pbp(season: int, *, force: bool = False) -> pd.DataFrame:
-    """Cache play-by-play in memory for one hour so active seasons refresh."""
+    """Cache play-by-play in memory for one hour so active seasons refresh.
+
+    Picking a game fires the summary, subtotals and plays requests together, so
+    on a cold season they would each download and parse the same file. Loads are
+    serialized and the cache is re-checked under the lock: the first request
+    loads, the others reuse its frame. Warm reads never take the lock.
+    """
     from gridiron.filmroom import pbp_metrics
 
-    now = time.monotonic()
-    cached = _PBP_CACHE.get(int(season))
-    if not force and cached and now - cached[0] < _PBP_CACHE_TTL_SECONDS:
-        return cached[1]
-    frame = pbp_metrics.load_pbp(int(season), force=force,
-                                 ttl_hours=_PBP_CACHE_TTL_SECONDS / 3600)
-    _PBP_CACHE[int(season)] = (now, frame)
-    while len(_PBP_CACHE) > 2:
-        del _PBP_CACHE[next(iter(_PBP_CACHE))]
-    return frame
+    season = int(season)
+
+    def fresh() -> pd.DataFrame | None:
+        cached = _PBP_CACHE.get(season)
+        if cached and time.monotonic() - cached[0] < _PBP_CACHE_TTL_SECONDS:
+            return cached[1]
+        return None
+
+    if not force and (frame := fresh()) is not None:
+        return frame
+    with _PBP_LOAD_LOCK:
+        if not force and (frame := fresh()) is not None:
+            return frame
+        now = time.monotonic()
+        frame = pbp_metrics.load_pbp(season, force=force,
+                                     ttl_hours=_PBP_CACHE_TTL_SECONDS / 3600)
+        _PBP_CACHE[season] = (now, frame)
+        while len(_PBP_CACHE) > 2:
+            del _PBP_CACHE[next(iter(_PBP_CACHE))]
+        return frame
 
 
 @app.get("/api/film/summary")
@@ -439,8 +602,12 @@ def film_subtotals(season: int, game_id: str) -> dict:
     EPA/play and success rate, by quarter and for the whole game. Powers the Film
     Room play-by-play subtotals (the tally shown at the end of each quarter)."""
     pbp = _pbp(int(season))
-    plays = pbp[(pbp["game_id"] == game_id)
-                & pbp["play_type"].isin(["pass", "run"])].copy()
+    # Take only the columns the tally reads: the frame has ~370, and copying all
+    # of them for one game's rows was most of this route's time.
+    cols = [c for c in ("posteam", "qtr", "yards_gained", "epa", "success")
+            if c in pbp.columns]
+    plays = pbp.loc[(pbp["game_id"] == game_id)
+                    & pbp["play_type"].isin(["pass", "run"]), cols]
     if plays.empty or not {"epa", "posteam"}.issubset(plays.columns):
         raise HTTPException(404, f"No play-by-play for {game_id}")
 
@@ -474,8 +641,15 @@ def film_plays(season: int, game_id: str) -> dict:
     """Every individual play in a game — ordered, numbered, and tagged with its
     EPA, grouped by quarter. Powers the Film Room per-play log."""
     pbp = _pbp(int(season))
-    g = pbp[pbp["game_id"] == game_id].copy()
-    if g.empty or "epa" not in g.columns:
+    if "epa" not in pbp.columns:
+        raise HTTPException(404, f"No play-by-play for {game_id}")
+    # Only the columns a play row reads (of ~370), so the per-row loop below
+    # handles eight values per play instead of the whole record.
+    cols = [c for c in ("play_id", "order_sequence", "qtr", "posteam", "down",
+                        "ydstogo", "play_type", "yards_gained", "epa", "desc")
+            if c in pbp.columns]
+    g = pbp.loc[pbp["game_id"] == game_id, cols]
+    if g.empty:
         raise HTTPException(404, f"No play-by-play for {game_id}")
     # Real snaps only: drop the GAME marker, timeouts and penalty-only no-plays.
     g = g[g["posteam"].notna() & g["play_type"].notna() & (g["play_type"] != "no_play")]
@@ -487,7 +661,7 @@ def film_plays(season: int, game_id: str) -> dict:
     def _opt(v, cast):
         return None if pd.isna(v) else cast(v)
 
-    def _row(n: int, r: pd.Series) -> dict[str, Any]:
+    def _row(n: int, r: dict[str, Any]) -> dict[str, Any]:
         return {
             "n": n,
             "offense": _opt(r.get("posteam"), str),
@@ -508,7 +682,7 @@ def film_plays(season: int, game_id: str) -> dict:
     for q in quarters:
         qrows = g if q is None else g[g["qtr"] == q]
         plays = []
-        for _, r in qrows.iterrows():
+        for r in qrows.to_dict("records"):
             n += 1
             plays.append(_row(n, r))
         by_quarter.append({"quarter": "" if q is None else _qlabel(int(q)), "plays": plays})

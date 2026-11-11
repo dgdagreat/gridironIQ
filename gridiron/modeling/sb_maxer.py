@@ -21,6 +21,8 @@ franchise success (see :mod:`gridiron.modeling.organization`). The positional
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pandas as pd
 
 from gridiron.modeling import cap_efficiency, organization
@@ -117,7 +119,32 @@ def current_form(season: int | None = None) -> pd.DataFrame:
                 "games", "form_score"]]
 
 
-def league_table(strength: pd.DataFrame) -> pd.DataFrame:
+@dataclass(frozen=True)
+class LeagueInputs:
+    """The league-wide inputs to the outlook that do not depend on any roster.
+
+    They are the expensive half of :func:`league_table` (a SQL view scan plus two
+    passes over the schedule) and are identical for every team and every simulated
+    roster, so a caller scoring more than one roster builds them once with
+    :func:`league_inputs` and passes them in. Treat the frames as read-only.
+    """
+
+    weights: pd.Series       # position importance, from the Boardroom
+    org: pd.DataFrame        # team, org_score
+    form: pd.DataFrame       # this season's results; empty before any games
+
+
+def league_inputs() -> LeagueInputs:
+    """Compute the roster-independent inputs once (see :class:`LeagueInputs`)."""
+    return LeagueInputs(
+        weights=position_weights(),
+        org=organization.franchise_strength()[["team", "org_score"]],
+        form=current_form(),
+    )
+
+
+def league_table(strength: pd.DataFrame, *,
+                 inputs: LeagueInputs | None = None) -> pd.DataFrame:
     """Per-team SB outlook + rank.
 
     Pre-season the outlook is roster readiness (55%) blended with organization
@@ -125,8 +152,11 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     that grows with games played (so the rank fluctuates week to week while roster
     quality still anchors it early). Columns: team, roster_readiness, org_score,
     form_score, wins, losses, ties, games, outlook, rank.
+
+    ``inputs`` reuses precomputed :class:`LeagueInputs`; omitted, they are computed.
     """
-    weights = position_weights()
+    inputs = league_inputs() if inputs is None else inputs
+    weights = inputs.weights
     blueprint = champion_blueprint(weights)
 
     wide = strength.pivot_table(index="team", columns="pos_group",
@@ -137,8 +167,7 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     roster = (100 * (1 - weighted_gap.sum(axis=1) / denom)).round(1)
 
     table = roster.rename("roster_readiness").reset_index()
-    org = organization.franchise_strength()[["team", "org_score"]]
-    table = table.merge(org, on="team", how="left")
+    table = table.merge(inputs.org, on="team", how="left")
     table["org_score"] = table["org_score"].fillna(50.0)
     table["base_outlook"] = (ROSTER_WEIGHT * table["roster_readiness"]
                              + (1 - ROSTER_WEIGHT) * table["org_score"]).round(1)
@@ -146,7 +175,7 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     # Mix in this season's results — weight ramps from ~0 at week 1 to
     # FORM_WEIGHT_MAX over a full 17-game season, so the roster/org projection
     # still anchors the outlook early while the rank moves as games are played.
-    form = current_form()
+    form = inputs.form
     if not form.empty:
         table = table.merge(form[["team", "wins", "losses", "ties", "games", "form_score"]],
                             on="team", how="left")
@@ -168,11 +197,18 @@ def league_table(strength: pd.DataFrame) -> pd.DataFrame:
     return table
 
 
-def team_report(team: str, strength: pd.DataFrame) -> dict:
-    """Full Maxer report for one team: score, rank, and ranked needs."""
-    weights = position_weights()
+def team_report(team: str, strength: pd.DataFrame, *,
+                inputs: LeagueInputs | None = None,
+                table: pd.DataFrame | None = None) -> dict:
+    """Full Maxer report for one team: score, rank, and ranked needs.
+
+    ``inputs`` and ``table`` let a caller that already has the league inputs or
+    this roster's :func:`league_table` reuse them instead of recomputing both.
+    """
+    inputs = league_inputs() if inputs is None else inputs
+    weights = inputs.weights
     blueprint = champion_blueprint(weights)
-    table = league_table(strength)
+    table = league_table(strength, inputs=inputs) if table is None else table
 
     if team not in set(table["team"]):
         raise KeyError(f"no roster strength loaded for team {team!r}")
