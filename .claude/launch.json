@@ -17,6 +17,18 @@
         "false"
       ],
       "port": 8501
+    },
+    {
+      "name": "gridiron-web",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "gridiron.api:app",
+        "--port",
+        "8000"
+      ],
+      "port": 8000
     }
   ]
 }

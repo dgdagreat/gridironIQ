@@ -101,7 +101,7 @@ frontend/
 | GET  | `/api/archetypes?k=` | `archetypes` | `clustering.cluster_archetypes()`, with `k` from 2 to 10 |
 | GET  | `/api/maxer/{team}` | `maxer` | `sb_maxer` + `trade_market`: report, needs, free agents, trade targets, league table, starters |
 | POST | `/api/maxer/{team}/simulate` | `maxerSimulate` | body `{signed, traded}`, at most 12 moves: recomputed report, league table, starters, and readiness deltas |
-| GET  | `/api/value-board?position=&limit=` | `valueBoard` | `value_board`: best values and biggest overpays |
+| GET  | `/api/value-board?position=&limit=` | `valueBoard` | the persisted `value_board` table: best values and biggest overpays |
 | GET  | `/api/film/games?season=` | `filmGames` | `schedules.list_games()` |
 | GET  | `/api/film/summary?season=&game_id=` | `filmSummary` | `pbp_metrics.build_breakdown_payload()` (no LLM call) |
 | GET  | `/api/film/subtotals?season=&game_id=` | `filmSubtotals` | per-offense plays, yards, EPA, EPA/play, and success rate, by quarter and for the game |
@@ -111,3 +111,10 @@ frontend/
 Every Film Room route except `/api/film/games` loads play-by-play for the season
 on first use, so the first request is slow and needs network access. It is
 cached in memory for an hour.
+
+**Caching.** Responses are gzipped, and a successful `GET /api/...` carries
+`Cache-Control: public, max-age=300`, so the browser reuses it for five minutes
+(moving between sections does not refetch). The data behind these routes changes
+daily at most. The Vite dev proxy rewrites that header to `no-store`, so in
+development every request reaches the API. Hashed files under `/assets/` are
+served as `immutable`; `index.html` is always revalidated.

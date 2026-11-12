@@ -11,7 +11,17 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: API, changeOrigin: true },
+      '/api': {
+        target: API,
+        changeOrigin: true,
+        // The API lets browsers reuse GET responses for five minutes. In dev that
+        // would hide an API change behind a cached response, so turn it off here.
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['cache-control'] = 'no-store'
+          })
+        },
+      },
     },
   },
 })

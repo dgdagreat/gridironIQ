@@ -33,6 +33,22 @@ PBP_URL = (
 #: Metrics that require charting feeds not present in play-by-play (phase 2).
 CHARTING_METRICS = ("wr_separation", "yards_after_contact")
 
+#: Every play-by-play column the per-game helpers below read (``list_games``,
+#: ``team_offense_metrics``, ``key_players``, ``_situational``).
+#: ``build_breakdown_payload`` keeps only these: nflverse ships ~370 columns and
+#: pandas pays for each of them on every row filter, which made a game summary
+#: roughly ten times slower. A helper that starts reading another column must
+#: add it here, or the payload will treat that column as absent.
+GAME_METRIC_COLUMNS = (
+    "game_id", "week", "home_team", "away_team", "home_score", "away_score",
+    "posteam", "play_type", "qtr", "down", "drive", "yardline_100",
+    "yards_gained", "epa", "success", "first_down", "qb_dropback", "qb_hit",
+    "sack", "interception", "fumble_lost", "touchdown", "td_team",
+    "pass_touchdown", "rush_touchdown", "complete_pass", "yards_after_catch",
+    "passer_player_name", "rusher_player_name", "receiver_player_name",
+    "fumbled_1_player_name",
+)
+
 
 def load_pbp(season: int, force: bool = False, timeout: int = 120,
              ttl_hours: float = 1.0) -> pd.DataFrame:
@@ -237,10 +253,14 @@ def build_breakdown_payload(pbp: pd.DataFrame, game_id: str) -> dict:
 
     This dict is the input to :func:`gridiron.filmroom.breakdown.generate_breakdown`.
     """
-    games = list_games(pbp).set_index("game_id")
-    if game_id not in games.index:
+    # Every metric below is per-game, so narrow to this game's rows and the
+    # columns the helpers read, once. They would otherwise each re-filter the
+    # whole season frame (tens of thousands of rows by ~370 columns) per team.
+    cols = [c for c in GAME_METRIC_COLUMNS if c in pbp.columns]
+    pbp = pbp.loc[pbp["game_id"] == game_id, cols]
+    if pbp.empty:
         raise KeyError(f"game_id {game_id!r} not found in play-by-play")
-    row = games.loc[game_id]
+    row = list_games(pbp).set_index("game_id").loc[game_id]
     tied = bool(row["tie"])
     home, away = row["home_team"], row["away_team"]
     home_offense = team_offense_metrics(pbp, game_id, home)
